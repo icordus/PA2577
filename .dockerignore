@@ -1,0 +1,16 @@
+**
+!requirements.txt
+!services/
+!services/tasks/
+!services/tasks/app.py
+!services/tasks/templates/
+!services/tasks/templates/**
+!services/tasks/static/
+!services/tasks/static/**
+!services/statistics/
+!services/statistics/app.py
+!services/statistics/requirements.txt
+**/.env*
+**/.secrets
+**/__pycache__
+**/*.py[cod]
