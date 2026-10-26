@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#155d47">
+  <title>Task Manager | PA2577</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='tasks.css') }}">
+  <script src="{{ url_for('static', filename='tasks.js') }}" defer></script>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <div><p class="eyebrow">PA2577 / WORKSPACE</p><h1>Task Manager<span class="title-dot">.</span></h1></div>
+      <button id="refresh" type="button" class="secondary">Refresh</button>
+    </header>
+
+    <section aria-label="Task statistics" class="summary">
+      <dl>
+        <div><dt>Total</dt><dd id="total">--</dd></div>
+        <div><dt>Completed</dt><dd id="completed">--</dd></div>
+        <div><dt>Pending</dt><dd id="pending">--</dd></div>
+      </dl>
+    </section>
+
+    <section class="composer" aria-labelledby="add-heading">
+      <h2 id="add-heading">New task</h2>
+      <form id="task-form">
+        <div class="input-group"><label for="task-title">Title</label><input id="task-title" name="title" type="text" maxlength="200" required autocomplete="off"></div>
+        <button id="add-task" type="submit">Add task</button>
+      </form>
+    </section>
+
+    <p id="feedback" role="status" aria-live="polite"></p>
+    <div id="errors" role="alert" hidden></div>
+
+    <section class="task-section" aria-labelledby="tasks-heading" aria-busy="true">
+      <div class="section-heading"><h2 id="tasks-heading">Tasks</h2><span id="list-count"></span></div>
+      <p id="empty-state">Loading tasks...</p>
+      <ul id="task-list" aria-label="Tasks"></ul>
+    </section>
+    <footer>PA2577 <span>Tasks / Statistics</span></footer>
+  </main>
+</body>
+</html>

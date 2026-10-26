@@ -1,0 +1,71 @@
+:root {
+  color-scheme: light;
+  --ink: #1c302a;
+  --muted: #566c63;
+  --green: #155d47;
+  --paper: #ffffff;
+  --line: #d6e1dc;
+  --red: #a32f38;
+  --accent: #df624a;
+  font-family: "Trebuchet MS", "Verdana", sans-serif;
+  color: var(--ink);
+  background: #f5f8f6;
+  letter-spacing: 0;
+}
+* { box-sizing: border-box; }
+body { margin: 0; border-top: 5px solid var(--green); background-image: linear-gradient(90deg, #155d4705 1px, transparent 1px); background-size: 48px 100%; min-height: 100vh; }
+main { width: min(920px, 100%); margin: 0 auto; padding: 48px 32px 24px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 28px; }
+.eyebrow { font-size: 11px; font-weight: 700; color: var(--muted); margin: 0 0 10px; }
+h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 40px; line-height: 1.1; margin: 0; }
+.title-dot { color: var(--accent); }
+h2 { font-size: 16px; margin: 0; }
+button, input { font: inherit; letter-spacing: 0; }
+button { min-height: 44px; padding: 10px 18px; border: 1px solid var(--green); border-radius: 4px; background: var(--green); color: white; font-weight: 700; cursor: pointer; }
+button:hover:not(:disabled) { background: #0d4936; }
+button:disabled { opacity: .55; cursor: wait; }
+button.secondary { background: transparent; color: var(--green); }
+button.secondary:hover:not(:disabled) { background: #e6f0eb; }
+:focus-visible { outline: 3px solid #d27816; outline-offset: 3px; }
+.summary { border-block: 1px solid var(--line); }
+dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 24px 0; }
+dl > div { padding-left: 28px; border-left: 1px solid var(--line); }
+dl > div:first-child { padding-left: 0; border: 0; }
+dt { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+dd { font-size: 32px; font-weight: 700; line-height: 1.2; margin: 0; min-height: 39px; overflow-wrap: anywhere; }
+#completed { color: var(--green); }
+#pending { color: #99482e; }
+.composer { padding: 28px 0 12px; }
+form { display: flex; gap: 12px; align-items: flex-end; margin-top: 16px; }
+.input-group { flex: 1; min-width: 0; }
+label { display: block; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+input[type="text"] { display: block; width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #91a99e; border-radius: 4px; background: var(--paper); color: var(--ink); }
+#feedback { min-height: 20px; margin: 8px 0 16px; font-size: 13px; color: var(--green); }
+#errors { border-left: 3px solid var(--red); background: #fff0f0; padding: 12px 14px; margin: 0 0 20px; color: #84212b; font-size: 14px; overflow-wrap: anywhere; }
+#errors p { margin: 4px 0; }
+.section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 2px solid var(--ink); }
+#list-count { font-size: 12px; color: var(--muted); }
+#empty-state { color: var(--muted); padding: 24px 0; }
+#task-list { list-style: none; padding: 0; margin: 0; }
+.task { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.task input[type="checkbox"] { width: 22px; height: 22px; margin: 0; accent-color: var(--green); cursor: pointer; }
+.task-title { margin: 0; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.task.is-completed .task-title { color: var(--muted); text-decoration: line-through; }
+.task-date { font-size: 11px; color: var(--muted); margin: 5px 0 0; }
+.delete-task { background: transparent; color: var(--red); border-color: transparent; font-size: 13px; padding: 10px 12px; }
+.delete-task:hover:not(:disabled) { background: #ffe9e9; }
+footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+@media (max-width: 560px) {
+  main { padding: 28px 18px 20px; }
+  h1 { font-size: 30px; }
+  .page-header { align-items: flex-end; }
+  .page-header button { font-size: 12px; padding-inline: 12px; }
+  dl > div { padding-left: 12px; }
+  dt { font-size: 12px; }
+  dd { font-size: 28px; }
+  form { flex-wrap: wrap; }
+  .input-group { flex-basis: 100%; }
+  form button { width: 100%; }
+  .task { column-gap: 10px; grid-template-columns: 22px minmax(0, 1fr) auto; }
+  .delete-task { padding-inline: 8px; }
+}
