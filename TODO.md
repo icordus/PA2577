@@ -17,7 +17,7 @@ Work one stage at a time. After each stage, report changes, verification command
 - [x] Inspected repository instructions and available workflows/container/Kubernetes configuration.
 - [x] Confirmed Raspberry Pi 4, Ubuntu 22.04, ARM64, Python 3.10, Docker 24.0.6, Kubernetes client/server 1.28.5/1.28.15.
 - [x] Confirmed Kubernetes access/node readiness at inspection time. Recheck health before future changes; Kubernetes 1.28 is unsupported upstream and must not be upgraded for this project.
-- [x] Confirmed GitHub reports no runner for PA2577. Runner registration/job verification remains TODO 7.
+- [x] Initial inspection found no PA2577 runner; user subsequently registered `pa2577-runner` with `self-hosted`, `Linux`, `ARM64` labels and enabled its systemd service.
 - [x] Decided Kubernetes replaces Compose; plain Kubernetes manifests are sufficient.
 
 Environment notes: Existing project NodePorts 30080/31674 were allocated; no StorageClass/PV/PVC was reported. Inspect storage before choosing a Kubernetes persistence method. Reports are historical and came from the Pi; this Mac checklist is not automatically synchronized there.
@@ -73,7 +73,8 @@ Reported command result: `Ran 3 tests in 20.234s`, `OK`, target `127.0.0.1:32771
 
 ## TODO 7 - CI Workflow (Not Started)
 
-- [ ] Resolve PA2577 self-hosted runner registration/access; verify labels and a real job. No runner is currently configured.
+- [x] Register PA2577 self-hosted runner `pa2577-runner` in its own directory; systemd reports `enabled` and `active` (user terminal output).
+- [ ] Confirm runner is online in GitHub and execute a real PA2577 CI job.
 - [ ] Add `.github/workflows/ci.yml` for pushes to `main` and manual runs; never execute external PR code on the personal runner.
 - [ ] Build ARM64 images and run isolated HTTP tests using only workflow-owned resources, without Compose or conflicts with app data.
 - [ ] Publish the exact tested images to Docker Hub only after tests pass, tagged with the full commit SHA.
