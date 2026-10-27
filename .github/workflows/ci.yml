@@ -1,12 +1,9 @@
 name: PA2577 CI
 
 on:
-  workflow_dispatch:
-    inputs:
-      image_version:
-        description: "New immutable release tag, e.g. v0.1.0; use a new version for each release"
-        required: true
-        type: string
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: read
@@ -19,8 +16,8 @@ jobs:
   test-and-publish:
     if: >-
       github.repository == 'icordus/PA2577' &&
-      github.ref == 'refs/heads/main' &&
-      github.event_name == 'workflow_dispatch'
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, linux, ARM64]
     timeout-minutes: 30
     defaults:
@@ -28,7 +25,7 @@ jobs:
         shell: bash
     env:
       DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
-      IMAGE_VERSION: ${{ inputs.image_version }}
+      IMAGE_VERSION: ${{ github.ref_name }}
       TASKS_BUILD_IMAGE: pa2577-ci-${{ github.run_id }}-${{ github.run_attempt }}-tasks:${{ github.sha }}
       STATISTICS_BUILD_IMAGE: pa2577-ci-${{ github.run_id }}-${{ github.run_attempt }}-statistics:${{ github.sha }}
       POSTGRES_IMAGE: docker.io/library/postgres:17-bookworm

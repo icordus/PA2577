@@ -75,13 +75,14 @@ Reported command result: `Ran 3 tests in 20.234s`, `OK`, target `127.0.0.1:32771
 
 - The isolated HTTP suite passed three tests on both 2026-10-26 and 2026-10-27; the latest took 20.234s. Both runs reported cleanup of only their temporary Docker network/containers and PostgreSQL tmpfs. No application database, persistent volume, Kubernetes, or PA2595 was touched.
 
-## TODO 7 - CI Workflow (Verified, 2026-10-27)
+## TODO 7 - CI Workflow (Tag Trigger Prepared Locally)
 
 - [x] Register `pa2577-runner`; systemd enabled/active with `self-hosted`, `Linux`, `ARM64` labels; GitHub dispatched and completed a real job.
-- [x] CI is manually dispatched from `main` only; pushes and pull requests do not trigger it.
+- [x] Previously verified workflow built and tested ARM64 images and published SHA tags.
+- [ ] Switch CI to trigger only on Git tags `v*`; validate semantic version format and keep branch pushes/PRs from triggering it.
 - [x] Ten offline safety tests and three isolated HTTP integration tests passed; the integration test used disposable PostgreSQL/tmpfs.
 - [x] Publish the exact tested ARM64 image IDs to Docker Hub, tagged with full commit SHA `5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`.
-- [ ] After CI version-input changes are committed, manually publish the same tested image IDs as fixed tag `v0.1.0`; keep the SHA tags and never overwrite an existing version tag.
+- [ ] Validate and publish this workflow change; push Git tag `v0.1.0` to publish the tested images with both the version and full SHA tags.
 - [x] Job cleanup reported completion; test containers/network/tmpfs were removed. No Kubernetes deployment occurred.
 - [x] Docker Hub variable/secret are configured sufficiently for the push to succeed; keep values private.
 

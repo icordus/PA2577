@@ -119,9 +119,9 @@ Tasks and Statistics images use commit `5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721
 - `docker.io/icordus/pa2577-statistics:5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`
 
 The chart default is now `v0.1.0` for a readable release tag. The already
-deployed Helm release remains on the SHA above until a later approved upgrade;
-the `v0.1.0` tags must first be published by manually dispatching CI with
-`image_version=v0.1.0`. CI also retains the full SHA tags.
+deployed Helm release remains on the SHA above until a later approved upgrade.
+CI publishes `v0.1.0` when the Git tag `v0.1.0` is pushed, alongside the full
+SHA tags.
 
 The first Helm deployment and HTTP checks on the Pi were reported successful.
 PostgreSQL pod recreation preserved the test task and PVC/PV identity. Pi reboot
@@ -142,12 +142,11 @@ curl --fail http://192.168.0.71:30081/api/statistics
 ## CI
 
 The GitHub Actions workflow is [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-It runs only when manually dispatched from `main`; pushes and pull requests do
-not trigger it. It builds
-ARM64 images, runs isolated HTTP integration tests with disposable PostgreSQL,
-and publishes the tested image IDs with both the full commit SHA and the fixed
-version supplied at dispatch (for example `v0.1.0`). Choose a new version for
-each release; CI refuses to overwrite an existing version tag. Repository
+It runs only when a Git tag matching `v*` is pushed; branch pushes and pull
+requests do not trigger it. The tag must use `vMAJOR.MINOR.PATCH`, for example
+`v0.1.0`. CI builds ARM64 images, runs isolated HTTP integration tests with
+disposable PostgreSQL, and publishes the tested image IDs under both that fixed
+version and the full commit SHA. A version tag cannot be reused. Repository
 settings required are the `DOCKERHUB_USERNAME` variable and `DOCKERHUB_TOKEN` secret.
 CI does not deploy to Kubernetes. Deployment workflow automation remains TODO.
 
