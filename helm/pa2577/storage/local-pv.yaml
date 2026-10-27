@@ -1,0 +1,31 @@
+# Separately approved cluster-wide storage, not installed by the Helm chart.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pa2577-postgres-pv
+  labels:
+    app.kubernetes.io/name: pa2577
+    app.kubernetes.io/component: postgres-storage
+spec:
+  capacity:
+    storage: 2Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: pa2577
+    name: pa2577-postgres-data
+  local:
+    path: /var/lib/pa2577/postgresql
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - raspberrypi2

@@ -8,7 +8,7 @@ Work one stage at a time. After each stage, report changes, verification command
 - Do not upgrade Kubernetes or delete existing data, volumes, or cluster resources.
 - Explain infrastructure changes and obtain approval before creating/running them.
 - Never commit credentials, `.env`, or kubeconfig. Do not print secrets.
-- Kubernetes is the orchestrator. Do not create or use Docker Compose.
+- Kubernetes is the orchestrator. Manage PA2577 resources through a Helm chart; do not create or use Docker Compose.
 - Use Docker for ARM64 image builds and isolated smoke/integration tests only.
 
 ## TODO 0 - Inspection (Closed)
@@ -18,7 +18,7 @@ Work one stage at a time. After each stage, report changes, verification command
 - [x] Confirmed Raspberry Pi 4, Ubuntu 22.04, ARM64, Python 3.10, Docker 24.0.6, Kubernetes client/server 1.28.5/1.28.15.
 - [x] Confirmed Kubernetes access/node readiness at inspection time. Recheck health before future changes; Kubernetes 1.28 is unsupported upstream and must not be upgraded for this project.
 - [x] Initial inspection found no PA2577 runner; user subsequently registered `pa2577-runner` with `self-hosted`, `Linux`, `ARM64` labels and enabled its systemd service.
-- [x] Decided Kubernetes replaces Compose; plain Kubernetes manifests are sufficient.
+- [x] Decided Kubernetes replaces Compose; TODO 8 subsequently selects a Helm chart rather than separately managed manifests.
 
 Environment notes: Existing project NodePorts 30080/31674 were allocated; no StorageClass/PV/PVC was reported. Inspect storage before choosing a Kubernetes persistence method. Reports are historical and came from the Pi; this Mac checklist is not automatically synchronized there.
 
@@ -88,19 +88,28 @@ Published images: `docker.io/icordus/pa2577-tasks:5c65f2dcd675a1bc8b6d1b378bd10b
 
 Security note: Docker warned that login credentials were stored unencrypted in the job's temporary `DOCKER_CONFIG`; cleanup reported removing it. Document this temporary exposure and cleanup limitation in TODO 11.
 
-## TODO 8 - Kubernetes Configuration (Not Started; Do Not Deploy)
+## TODO 8 - Helm Chart (Locally Validated; No Deployment)
 
-- [ ] Use namespace `pa2577`; deploy the self-developed Tasks and Statistics services plus separate PostgreSQL/PVC.
-- [ ] Inspect StorageClasses/PVs first; explain Pi preparation and obtain approval before infrastructure changes.
-- [ ] Use a Kubernetes Secret for the database password, readiness/liveness probes, and suitable CPU/memory requests/limits.
-- [ ] Expose the UI/API from outside the cluster using an available Service/NodePort; verify browser access.
-- [ ] Allow independent horizontal scaling of both Flask Deployments; keep PostgreSQL at one instance.
-- [ ] Pull application images from Docker Hub using full-SHA tags; never rely on manually imported images.
-- [ ] Validate manifests against the existing Kubernetes API version. Do not deploy in this stage.
+- [x] Initial storage inspection found no StorageClass, PV, or PVC. Node raspberrypi2 was Ready, ARM64, with no taints; API server is v1.28.15. Separately approved PV creation is recorded below.
+- [x] Prepare helm/pa2577 with namespace pa2577, Tasks/Statistics Deployments and Services, and separate single-replica PostgreSQL with PVC and init ConfigMap.
+- [x] Reference an externally prepared Kubernetes Secret; include probes, non-root security contexts, read-only root filesystems, and CPU/memory budgets. No password or Secret resource is included.
+- [x] Propose Tasks NodePort 30081: no current Service or TCP listener uses it; existing NodePorts 30080/31674 are left unchanged.
+- [x] Lint/render independent Tasks and Statistics replicaCount values (2 and 3); PostgreSQL remains fixed at one replica with Recreate strategy.
+- [x] Reference reported CI-tested Docker Hub images using full SHA 5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721 and imagePullPolicy Always; no manual imports.
+- [x] Run helm lint --strict and helm template locally with --namespace pa2577 --kube-version 1.28.15; 1 chart linted, 0 failed. Also passed with the independent scaling overrides.
+- [x] Obtain separate user approvals for the dedicated local-PV strategy, administrative directory preparation, and creation of only the cluster-wide PV.
+- [x] Verify the user-prepared /var/lib/pa2577/postgresql directory metadata: mode 0700, UID/GID 999:999; no agent permission or data changes.
+- [x] Create and verify only pa2577-postgres-pv: 2Gi, Retain, ReadWriteOnce, filesystem, no StorageClass, local path, node affinity raspberrypi2, reserved for pa2577/pa2577-postgres-data; phase Available.
+- [ ] Prepare the external Secret after approval; verify PVC binding, image pulls, init/probes/DNS, and actual resource suitability during a separately approved deployment.
+- [ ] Verify external browser access, independent live scaling, and persistent data in TODO 9/10. No install/upgrade/apply/deployment was performed here.
+
+Approved storage preparation (2026-10-27): the user created the dedicated directory /var/lib/pa2577/postgresql with mode 0700 and UID/GID 999:999. No existing PV/PVC name conflicts were found. The agent server-dry-run validated and then created only the 2Gi local PV pa2577-postgres-pv using helm/pa2577/storage/local-pv.yaml, outside the chart templates. The actual PV has Retain, node affinity raspberrypi2, and claimRef pa2577/pa2577-postgres-data without a claim UID. Its phase is Available; no PVC or namespace pa2577 exists yet, and no Secret, pod, or deployment was created. No volume contents were read or changed. The native Docker PostgreSQL container/data and other projects remain untouched. No StorageClass, provisioner, sudo, commit, push, or deployment action was performed. The 2Gi capacity is not an enforced disk quota. Stop pending separate approval for subsequent resources.
+
+Alternative: approve a dynamic local-storage provisioner and adapt the claim; this is additional cluster-wide infrastructure, not an automatic fallback. See helm/pa2577/README.md for options, Secret key names, retention limits, and local validation commands. Registry contents, Secret existence, permissions, and live behavior were not tested. No Secret values or kubeconfig were read or displayed.
 
 ## TODO 9 - Deployment Workflow (Not Started)
 
-- [ ] Add manual `.github/workflows/deploy.yml` requiring a commit SHA whose CI passed; use that commit's manifests/images without rebuilding.
+- [ ] Add manual `.github/workflows/deploy.yml` requiring a commit SHA whose CI passed; use that commit's Helm chart/values and images without rebuilding.
 - [ ] Verify runner cluster access; scope changes to namespace `pa2577` except explicitly approved cluster-wide storage preparation.
 - [ ] Wait for rollout/readiness, run HTTP checks, fail on verification errors, and document rollback.
 - [ ] Obtain explicit user confirmation before the first deployment.

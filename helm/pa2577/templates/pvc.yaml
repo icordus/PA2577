@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-postgres-data
+  namespace: {{ .Values.namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ .Values.postgresql.persistence.storageClassName | quote }}
+  volumeName: {{ .Values.postgresql.persistence.volumeName | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.persistence.size }}

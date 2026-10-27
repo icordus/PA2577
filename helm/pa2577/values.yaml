@@ -1,0 +1,48 @@
+namespace: pa2577
+
+# Use the full commit SHA whose images passed CI, not latest.
+imageTag: "5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721"
+imagePullSecrets: []
+
+tasks:
+  repository: docker.io/icordus/pa2577-tasks
+  replicaCount: 1
+  service:
+    nodePort: 30081
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+statistics:
+  repository: docker.io/icordus/pa2577-statistics
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 192Mi
+
+postgresql:
+  image: docker.io/library/postgres:17-bookworm
+  # Create this Secret separately in pa2577 after approval; do not put passwords here.
+  existingSecret: pa2577-database
+  adminPasswordKey: postgres-password
+  tasksPasswordKey: tasks-password
+  persistence:
+    size: 2Gi
+    # No provisioner is installed. An approved, dedicated local PV must exist first.
+    storageClassName: ""
+    volumeName: pa2577-postgres-pv
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi

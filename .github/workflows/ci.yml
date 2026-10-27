@@ -1,9 +1,6 @@
 name: PA2577 CI
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -18,7 +15,7 @@ jobs:
     if: >-
       github.repository == 'icordus/PA2577' &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, linux, ARM64]
     timeout-minutes: 30
     defaults:
