@@ -1,0 +1,10 @@
+{{- include "pa2577.validate" . }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    app.kubernetes.io/name: pa2577
+    app.kubernetes.io/instance: {{ .Release.Name }}
