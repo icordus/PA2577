@@ -88,31 +88,47 @@ Published images: `docker.io/icordus/pa2577-tasks:5c65f2dcd675a1bc8b6d1b378bd10b
 
 Security note: Docker warned that login credentials were stored unencrypted in the job's temporary `DOCKER_CONFIG`; cleanup reported removing it. Document this temporary exposure and cleanup limitation in TODO 11.
 
-## TODO 8 - Helm Chart (Locally Validated; No Deployment)
+## TODO 8 - Helm Chart (First Approved Deployment Verified over HTTP)
 
 - [x] Initial storage inspection found no StorageClass, PV, or PVC. Node raspberrypi2 was Ready, ARM64, with no taints; API server is v1.28.15. Separately approved PV creation is recorded below.
 - [x] Prepare helm/pa2577 with namespace pa2577, Tasks/Statistics Deployments and Services, and separate single-replica PostgreSQL with PVC and init ConfigMap.
 - [x] Reference an externally prepared Kubernetes Secret; include probes, non-root security contexts, read-only root filesystems, and CPU/memory budgets. No password or Secret resource is included.
-- [x] Propose Tasks NodePort 30081: no current Service or TCP listener uses it; existing NodePorts 30080/31674 are left unchanged.
+- [x] Verify Tasks NodePort 30081 was free before deployment and is now allocated only to pa2577-tasks; existing NodePorts 30080/31674 are left unchanged.
 - [x] Lint/render independent Tasks and Statistics replicaCount values (2 and 3); PostgreSQL remains fixed at one replica with Recreate strategy.
 - [x] Reference reported CI-tested Docker Hub images using full SHA 5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721 and imagePullPolicy Always; no manual imports.
 - [x] Run helm lint --strict and helm template locally with --namespace pa2577 --kube-version 1.28.15; 1 chart linted, 0 failed. Also passed with the independent scaling overrides.
 - [x] Obtain separate user approvals for the dedicated local-PV strategy, administrative directory preparation, and creation of only the cluster-wide PV.
 - [x] Verify the user-prepared /var/lib/pa2577/postgresql directory metadata: mode 0700, UID/GID 999:999; no agent permission or data changes.
-- [x] Create and verify only pa2577-postgres-pv: 2Gi, Retain, ReadWriteOnce, filesystem, no StorageClass, local path, node affinity raspberrypi2, reserved for pa2577/pa2577-postgres-data; phase Available.
-- [ ] Prepare the external Secret after approval; verify PVC binding, image pulls, init/probes/DNS, and actual resource suitability during a separately approved deployment.
-- [ ] Verify external browser access, independent live scaling, and persistent data in TODO 9/10. No install/upgrade/apply/deployment was performed here.
+- [x] Create and verify pa2577-postgres-pv: 2Gi, Retain, ReadWriteOnce, filesystem, no StorageClass, local path, node affinity raspberrypi2; initially Available, now Bound to pa2577/pa2577-postgres-data.
+- [x] Obtain explicit user approval for namespace, external Secret, and the first Helm deployment; create new credentials without displaying or saving them locally.
+- [x] Install release pa2577, revision 1, using the existing chart and CI-tested images; verify all three Deployments available 1/1 with zero pod restarts.
+- [x] Verify PVC/PV binding, initial database/schema setup, probes, service DNS, running image digests, and the actual non-superuser Tasks login.
+- [x] Verify page, health/readiness, CRUD/statistics and invalid-input handling through http://192.168.0.71:30081; remove only the unique test record.
+- [ ] Confirm browser access from the user's device and assess resource budgets under representative load.
+- [ ] Verify independent live scaling and persistence after PostgreSQL pod recreation/reboot in TODO 10; these checks have not been performed.
 
-Approved storage preparation (2026-10-27): the user created the dedicated directory /var/lib/pa2577/postgresql with mode 0700 and UID/GID 999:999. No existing PV/PVC name conflicts were found. The agent server-dry-run validated and then created only the 2Gi local PV pa2577-postgres-pv using helm/pa2577/storage/local-pv.yaml, outside the chart templates. The actual PV has Retain, node affinity raspberrypi2, and claimRef pa2577/pa2577-postgres-data without a claim UID. Its phase is Available; no PVC or namespace pa2577 exists yet, and no Secret, pod, or deployment was created. No volume contents were read or changed. The native Docker PostgreSQL container/data and other projects remain untouched. No StorageClass, provisioner, sudo, commit, push, or deployment action was performed. The 2Gi capacity is not an enforced disk quota. Stop pending separate approval for subsequent resources.
+Initial approved storage preparation (2026-10-27): the user created the dedicated directory /var/lib/pa2577/postgresql with mode 0700 and UID/GID 999:999. No existing PV/PVC name conflicts were found. The agent server-dry-run validated and then created only the 2Gi local PV pa2577-postgres-pv using helm/pa2577/storage/local-pv.yaml, outside the chart templates. At that point its phase was Available, with claimRef pa2577/pa2577-postgres-data without a claim UID, and no namespace, PVC, Secret, pod, or deployment existed. No directory contents were read or changed during that preparation. The 2Gi capacity is not an enforced disk quota. The subsequently approved first deployment is recorded below.
 
-Alternative: approve a dynamic local-storage provisioner and adapt the claim; this is additional cluster-wide infrastructure, not an automatic fallback. See helm/pa2577/README.md for options, Secret key names, retention limits, and local validation commands. Registry contents, Secret existence, permissions, and live behavior were not tested. No Secret values or kubeconfig were read or displayed.
+Alternative storage provisioners still require separate approval and are not an automatic fallback. See helm/pa2577/README.md for Secret key names, retention limits, and validation commands. No Secret values or kubeconfig were displayed.
+
+### First Approved Helm Deployment (2026-10-27)
+
+- The user explicitly selected approval for namespace, Secret, and the first Helm deployment. Preflight found no existing release/namespace, the PV was Available, the node was schedulable, and NodePort 30081 was free.
+- Created namespace pa2577 with Helm ownership metadata, then external Secret pa2577-database with distinct new postgres-password/tasks-password values generated in memory and sent via stdin. No password was printed or written to local files/Git. The chart references but does not manage this Secret.
+- Executed `helm install pa2577 helm/pa2577 --namespace pa2577 --wait --timeout 5m`. Result: STATUS deployed, REVISION 1. No automatic deletion or rollback flags were used.
+- All Deployments rolled out: Tasks, Statistics, and PostgreSQL are each 1/1 Ready/Available, with zero observed pod restarts. PVC pa2577-postgres-data is Bound to the dedicated pa2577-postgres-pv; Retain remains in effect.
+- Running Tasks/Statistics image digests match the CI-published digests recorded in TODO 7. Both use full SHA 5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721. PostgreSQL uses the expected official image digest. No image was rebuilt or manually imported.
+- From the actual Tasks container, verified effective UID/GID 10001, current_user pa2577_tasks, database pa2577, and all elevated role flags false. Successful HTTP statistics calls verify the configured in-cluster service path and initialized task table.
+- NodePort HTTP checks from the Pi passed for /, /health, /ready, task create/list/complete/delete, statistics, invalid title, and invalid completed value. Total/completed/pending were 0/0/0 -> 1/0/1 -> 1/1/0 -> 0/0/0. Only the uniquely marked verification task was deleted, and its absence was confirmed.
+- PostgreSQL initialization wrote only to the newly approved Kubernetes PV. The existing native Docker PostgreSQL/data, native Flask services, PA2595, and other namespaces were not modified. No sudo, commit, push, CI execution, or deployment workflow creation occurred.
+- External browser access from the user's device, independent scaling, pod-recreation/reboot persistence, backup/restore, and load/resource suitability remain unverified. Stop and wait for the user's results before further changes.
 
 ## TODO 9 - Deployment Workflow (Not Started)
 
 - [ ] Add manual `.github/workflows/deploy.yml` requiring a commit SHA whose CI passed; use that commit's Helm chart/values and images without rebuilding.
 - [ ] Verify runner cluster access; scope changes to namespace `pa2577` except explicitly approved cluster-wide storage preparation.
 - [ ] Wait for rollout/readiness, run HTTP checks, fail on verification errors, and document rollback.
-- [ ] Obtain explicit user confirmation before the first deployment.
+- [x] Obtain explicit confirmation before the first manual Helm deployment (recorded in TODO 8); the deployment workflow is still not implemented and its first execution needs separate approval.
 
 ## TODO 10 - Demonstration (Not Started)
 

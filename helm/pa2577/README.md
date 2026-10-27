@@ -1,7 +1,8 @@
 # PA2577 Helm Chart
 
 This chart is prepared for Kubernetes 1.28 on the ARM64 Raspberry Pi.
-It has only been linted and rendered locally. Nothing has been deployed.
+It was first deployed after explicit user approval on 2026-10-27.
+Release `pa2577`, revision 1, is deployed and passed the HTTP checks below.
 Use release name `pa2577` and namespace `pa2577` for the names below.
 
 ## Resources
@@ -10,7 +11,7 @@ Use release name `pa2577` and namespace `pa2577` for the names below.
 - Tasks Deployment and NodePort Service `pa2577-tasks`.
 - Statistics Deployment and ClusterIP Service `pa2577-statistics`.
 - Single-replica PostgreSQL Deployment, ClusterIP Service, init ConfigMap, and PVC.
-- No Secret, PV, StorageClass, provisioner, host directory, or Helm hook is created.
+- The chart itself creates no Secret, PV, StorageClass, provisioner, host directory, or Helm hook.
 
 Tasks and Statistics use separate `replicaCount` values. PostgreSQL always has
 one replica and uses `Recreate`, avoiding an overlapping rolling update.
@@ -26,7 +27,8 @@ The default Tasks and Statistics Docker Hub tag is the full CI commit SHA:
 `5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`
 
 The repository checklist reports that these exact ARM64 images passed CI and
-were published. This preparation did not repeat CI or query the registry.
+were published. The running Tasks/Statistics image digests were subsequently
+verified to match the published digests. CI was not repeated for deployment.
 `imagePullPolicy: Always` requires registry pulls, never manual image imports.
 If the repositories are private, supply an existing registry Secret name through
 `imagePullSecrets`; do not store registry credentials in chart values.
@@ -36,17 +38,18 @@ version on an existing data directory without a separate migration plan.
 
 ## External Access
 
-Proposed URL after an approved successful deployment:
+Application URL after the approved first deployment:
 
 `http://192.168.0.71:30081/`
 
 Inspection on 2026-10-27 found NodePorts `30080` and `31674` already allocated.
-No Service or host TCP listener used `30081`. This is not a reservation: recheck
-before deployment. The chart assumes the standard NodePort range 30000-32767;
-the actual API-server range has not been independently checked.
+Port `30081` was free before installation and is now assigned to pa2577-tasks.
+The server accepted this port. Other ports in the NodePort range have not been
+validated for future use; recheck conflicts before changing the port.
 
-NodePort is not loopback-only: it can expose Tasks on node interfaces. Firewall,
-LAN routing, and browser access remain untested. There is no authentication or
+NodePort is not loopback-only: it can expose Tasks on node interfaces. HTTP at
+the node's LAN IP was verified from the Pi; access from the user's browser/device
+and external firewall/routing remain unverified. There is no authentication or
 HTTPS; do not expose this service directly to the Internet. Statistics and
 PostgreSQL have no NodePort and are not directly exposed outside the cluster.
 
@@ -55,7 +58,7 @@ PostgreSQL have no NodePort and are not directly exposed outside the cluster.
 Initial read-only inspection found no StorageClasses, PVs, or PVCs. The default claim
 requests 2 GiB, `ReadWriteOnce`, `storageClassName: ""`, and the explicit PV name
 `pa2577-postgres-pv`. It cannot provision storage automatically. The separately
-approved PV now exists, but PVC binding has not been tested or performed.
+approved PV now exists and is Bound to the claim after the approved deployment.
 
 Approved storage requirements for this single Pi:
 
@@ -75,10 +78,11 @@ only `pa2577-postgres-pv` with `kubectl create`. The actual PV was verified:
 2 GiB, `ReadWriteOnce`, filesystem mode, `Retain`, no StorageClass, local path
 above, and node affinity `kubernetes.io/hostname=raspberrypi2`.
 
-The PV is `Available`, with claimRef reserving it for
-`pa2577/pa2577-postgres-data` but no claim UID yet. No PVC, namespace, Secret,
-pod, or deployment was created. Available does not mean mounted or tested with
-PostgreSQL. Directory contents, data persistence, and mounting remain unverified.
+The PV was initially `Available`, reserved for `pa2577/pa2577-postgres-data`.
+After the separately approved deployment, the PVC and PV are `Bound`, and
+PostgreSQL initialized the new data directory successfully. Tasks CRUD passed
+against that database. Persistence after PostgreSQL pod recreation/reboot and
+backup/restore have not been tested. Existing Docker data was never reused.
 The capacity field is not an enforced filesystem quota or reserved disk space.
 
 The PV definition is outside `templates/`, so the Helm chart does not create,
@@ -106,13 +110,15 @@ storage and multiple replicas on one Pi do not survive failure of that Pi.
 
 ## Existing Database Secret
 
-Before an approved deployment, prepare an existing Secret in `pa2577`:
+The first approved deployment prepared an external Secret in `pa2577`:
 
 - Name: `pa2577-database` (configurable as `postgresql.existingSecret`).
 - Key `postgres-password`: a unique administrator password.
 - Key `tasks-password`: a different unique password for `pa2577_tasks`.
 
-No values or Secret manifest are included. Generate and supply passwords using
+Distinct new passwords were generated in memory and sent through stdin; no
+password was printed, stored in a local file, or committed. No values or Secret
+manifest are included. Future password preparation must use
 an approved private process, without command-line literals, logs, or committed
 files. Do not copy the existing application's credentials.
 
@@ -141,9 +147,40 @@ Statistics readiness uses its local `/health`. Database/HTTP timeouts let failed
 dependencies return safe errors instead of requiring a startup-order hack.
 
 Default requests are 300m CPU and 448 MiB RAM total at one replica per service;
-limits total 2 CPUs and 960 MiB RAM. Resource suitability, volume permissions,
-image pulls, DNS, probes, initialization, external access, and persistence still
-need runtime validation after an approved deployment.
+limits total 2 CPUs and 960 MiB RAM. Initial rollout, image pulls, probes, volume
+mounting, database initialization, and service DNS passed. All three pods were
+1/1 Ready with zero observed restarts. Resource suitability under load, browser
+access from another device, and persistence after pod recreation remain untested.
+
+## First Deployment Verification
+
+The approved command was:
+
+```bash
+helm install pa2577 helm/pa2577 --namespace pa2577 --wait --timeout 5m
+```
+
+It completed with status `deployed`, revision 1. Do not rerun this install against
+an existing release or perform upgrades/uninstalls without separate approval.
+
+HTTP checks on the Pi verified the page, /health, /ready, CRUD, statistics, and
+invalid input. One uniquely marked task changed total/completed/pending counts
+from 0/0/0 to 1/0/1 and 1/1/0, then back to 0/0/0 after deleting only that task.
+The actual Tasks process ran as UID/GID 10001 and connected as pa2577_tasks with
+no elevated database role flags. No native service or database was changed.
+
+Read-only status and HTTP checks:
+
+```bash
+helm status pa2577 --namespace pa2577
+kubectl -n pa2577 get deployments,pods,services,pvc
+kubectl get pv pa2577-postgres-pv
+curl --fail-with-body http://192.168.0.71:30081/ready
+curl --fail-with-body http://192.168.0.71:30081/api/statistics
+```
+
+Expected: deployed release, available workloads, Bound storage, readiness
+{"status":"ok"}, and counters matching the current task list.
 
 ## Local Validation Only
 
