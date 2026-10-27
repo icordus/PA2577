@@ -121,7 +121,15 @@ and pull requests do not trigger it. There is no manual CI trigger.
 
 CI also runs offline isolation tests and cleans its temporary resources.
 It refuses to overwrite an existing version tag and **does not deploy**.
-Configure the repository variable `DOCKERHUB_USERNAME` and secret `DOCKERHUB_TOKEN`.
+
+### Docker Hub Configuration
+
+In GitHub, open **Settings > Secrets and variables > Actions** and configure:
+
+- **Variables > New repository variable:** `DOCKERHUB_USERNAME` = your Docker Hub username (`icordus` for this chart).
+- **Secrets > New repository secret:** `DOCKERHUB_TOKEN` = a Docker Hub personal access token with **Read & Write** permissions.
+
+Create the token in Docker Hub account settings. CI uses it to publish images; deploy does not use it.
 
 Sources: [GitHub](https://github.com/icordus/PA2577).
 Images: [Tasks](https://hub.docker.com/r/icordus/pa2577-tasks) and
