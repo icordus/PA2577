@@ -15,22 +15,27 @@ scaling the two application services independently.
 ```mermaid
 flowchart LR
 	Browser[Browser]
-	subgraph Kubernetes[Namespace: pa2577]
-		TasksSvc[Tasks Service]
-		Tasks["Tasks API + UI<br/>Deployment"]
-		StatsSvc[Statistics Service]
-		Stats["Statistics API<br/>Deployment"]
-		DBSvc[PostgreSQL Service]
-		DB[(PostgreSQL)]
-		TasksSvc --> Tasks
-		Tasks -->|HTTP statistics| StatsSvc
-		StatsSvc --> Stats
-		Stats -->|GET /api/tasks| TasksSvc
-		Tasks -->|SQL| DBSvc
-		DBSvc --> DB
+	subgraph Cluster[Kubernetes Cluster]
+		subgraph Namespace[Namespace: pa2577]
+			TasksSvc[Tasks Service]
+			Tasks["Tasks API + UI<br/>Deployment"]
+			StatsSvc[Statistics Service]
+			Stats["Statistics API<br/>Deployment"]
+			DBSvc[PostgreSQL Service]
+			DB[(PostgreSQL)]
+			PVC[PersistentVolumeClaim]
+			TasksSvc --> Tasks
+			Tasks -->|HTTP statistics| StatsSvc
+			StatsSvc --> Stats
+			Stats -->|GET /api/tasks| TasksSvc
+			Tasks -->|SQL| DBSvc
+			DBSvc --> DB
+			DB --> PVC
+		end
+		PV[(Local PersistentVolume)]
+		PVC --> PV
 	end
 	Browser -->|HTTP :30081| TasksSvc
-	DB -->|PVC| PV[(Local PersistentVolume)]
 ```
 
 - **Tasks:** Deployment serving the UI and task API, exposed through the Tasks Service (NodePort 30081). It is the only application component that accesses PostgreSQL.
