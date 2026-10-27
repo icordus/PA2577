@@ -1,7 +1,6 @@
 # PA2577 Helm Chart
 
 This chart is prepared for Kubernetes 1.28 on the ARM64 Raspberry Pi.
-It was first deployed after explicit user approval on 2026-10-27.
 The first release, revision 1, passed the HTTP checks recorded below.
 Use release name `pa2577` and namespace `pa2577` for the names below.
 
