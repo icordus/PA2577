@@ -23,7 +23,7 @@ node_arch="$(kubectl get node raspberrypi2 -o jsonpath='{.metadata.labels.kubern
 kubectl -n pa2577 get secret pa2577-database -o name >/dev/null
 helm status pa2577 --namespace pa2577 >/dev/null
 
-kube_version="$(kubectl version -o jsonpath='{.serverVersion.gitVersion}')"
+kube_version="$(kubectl version -o json | python3 -c 'import json, sys; print(json.load(sys.stdin)["serverVersion"]["gitVersion"])')"
 helm lint helm/pa2577 --namespace pa2577 --kube-version "${kube_version#v}" --strict
 helm template pa2577 helm/pa2577 --namespace pa2577 --kube-version "${kube_version#v}" >/dev/null
 
