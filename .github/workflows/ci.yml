@@ -38,207 +38,29 @@ jobs:
           persist-credentials: false
 
       - name: Check prerequisites and allocate an integration ID
-        run: |
-          set -euo pipefail
-          if [[ ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo '::error::GITHUB_SHA is not a full 40-character commit SHA.'
-            exit 1
-          fi
-          if [[ ! "${IMAGE_VERSION:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo '::error::IMAGE_VERSION must be a fixed vMAJOR.MINOR.PATCH value, such as v0.1.0.'
-            exit 1
-          fi
-          if [[ -z "${DOCKERHUB_USERNAME:-}" ]]; then
-            echo '::error::Set the repository variable DOCKERHUB_USERNAME.'
-            exit 1
-          fi
-          if [[ ! "$DOCKERHUB_USERNAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
-            echo '::error::DOCKERHUB_USERNAME has an invalid format.'
-            exit 1
-          fi
-          case "$(uname -m)" in
-            aarch64|arm64) ;;
-            *) echo '::error::The self-hosted runner must be Linux ARM64.' >&2; exit 1 ;;
-          esac
-          case "$(docker info --format '{{.OSType}}/{{.Architecture}}')" in
-            linux/aarch64|linux/arm64) ;;
-            *) echo 'A reachable Linux ARM64 Docker daemon is required.' >&2; exit 1 ;;
-          esac
-          if ! command -v python3 >/dev/null 2>&1; then
-            echo '::error::python3 is required on the self-hosted runner.'
-            exit 1
-          fi
-          umask 077
-          DOCKER_CONFIG="$(mktemp -d "$RUNNER_TEMP/pa2577-docker-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-XXXXXX")"
-            export DOCKER_CONFIG
-          printf 'DOCKER_CONFIG=%s\n' "$DOCKER_CONFIG" >> "$GITHUB_ENV"
-            chmod 700 "$DOCKER_CONFIG"
-          python3 - <<'PY'
-          import os
-          import uuid
-          with open(os.environ["GITHUB_ENV"], "a") as output:
-              output.write("INTEGRATION_RUN_ID=" + uuid.uuid4().hex + "\n")
-          PY
+        run: bash scripts/ci_init.sh
 
       - name: Run offline isolation safety tests
         run: python3 -m unittest discover -s tests -p test_integration_safety.py -v
 
       - name: Build ARM64 images once and record their identities
-        run: |
-          set -euo pipefail
-          docker build --platform linux/arm64 \
-            --tag "$TASKS_BUILD_IMAGE" --file services/tasks/Dockerfile .
-          docker build --platform linux/arm64 \
-            --tag "$STATISTICS_BUILD_IMAGE" --file services/statistics/Dockerfile .
-          {
-            echo "TASKS_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$TASKS_BUILD_IMAGE")"
-            echo "STATISTICS_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$STATISTICS_BUILD_IMAGE")"
-          } >> "$GITHUB_ENV"
+        run: bash scripts/ci_build.sh
 
-      - name: Fetch disposable PostgreSQL image
-        run: docker pull --platform linux/arm64 "$POSTGRES_IMAGE"
-
-      - name: Test the exact built images over isolated HTTP
-        run: |
-          set -euo pipefail
-          python3 scripts/integration_http.py --execute \
-            --run-id "$INTEGRATION_RUN_ID" \
-            --tasks-image "$TASKS_IMAGE_ID" \
-            --statistics-image "$STATISTICS_IMAGE_ID" \
-            --postgres-image "$POSTGRES_IMAGE"
+      - name: Fetch PostgreSQL and test the exact built images over isolated HTTP
+        run: bash scripts/ci_test.sh
 
       - name: Log in to Docker Hub only after tests pass
         env:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [[ -z "$DOCKERHUB_TOKEN" ]]; then
-            echo 'DOCKERHUB_TOKEN is required for publication.' >&2
-            exit 1
-          fi
-          printf '%s' "$DOCKERHUB_TOKEN" | docker login docker.io \
-            --username "$DOCKERHUB_USERNAME" --password-stdin
+        run: bash scripts/ci_login.sh
 
       - name: Publish tested image IDs with fixed version and full SHA tags
-        run: |
-          set -euo pipefail
-          tasks_repo="docker.io/$DOCKERHUB_USERNAME/pa2577-tasks"
-          statistics_repo="docker.io/$DOCKERHUB_USERNAME/pa2577-statistics"
-          tasks_sha_image="$tasks_repo:$GITHUB_SHA"
-          statistics_sha_image="$statistics_repo:$GITHUB_SHA"
-          tasks_version_image="$tasks_repo:$IMAGE_VERSION"
-          statistics_version_image="$statistics_repo:$IMAGE_VERSION"
-
-          # Fixed release tags are immutable by convention: refuse to overwrite one.
-          for image in "$tasks_version_image" "$statistics_version_image"; do
-            set +e
-            inspect_output=$(docker manifest inspect "$image" 2>&1)
-            inspect_status=$?
-            set -e
-            if [[ "$inspect_status" -eq 0 ]]; then
-              echo "::error::Release image tag already exists: $image"
-              exit 1
-            fi
-            if [[ "$inspect_output" != *"manifest unknown"* && "$inspect_output" != *"no such manifest"* ]]; then
-              echo '::error::Could not safely verify that the release image tag is unused; refusing to publish.'
-              exit 1
-            fi
-          done
-
-          docker tag "$TASKS_IMAGE_ID" "$tasks_sha_image"
-          docker tag "$STATISTICS_IMAGE_ID" "$statistics_sha_image"
-          docker tag "$TASKS_IMAGE_ID" "$tasks_version_image"
-          docker tag "$STATISTICS_IMAGE_ID" "$statistics_version_image"
-          for image in "$tasks_sha_image" "$tasks_version_image"; do
-            [[ "$(docker image inspect --format '{{.Id}}' "$image")" == "$TASKS_IMAGE_ID" ]]
-          done
-          for image in "$statistics_sha_image" "$statistics_version_image"; do
-            [[ "$(docker image inspect --format '{{.Id}}' "$image")" == "$STATISTICS_IMAGE_ID" ]]
-          done
-
-          docker push "$tasks_sha_image"
-          docker push "$statistics_sha_image"
-          docker push "$tasks_version_image"
-          docker push "$statistics_version_image"
-          {
-            printf '## Tested Images\n\nCommit: `%s`\nVersion: `%s`\n\n' "$GITHUB_SHA" "$IMAGE_VERSION"
-            printf -- '- `%s`\n- `%s`\n- `%s`\n- `%s`\n' \
-              "$tasks_sha_image" "$statistics_sha_image" \
-              "$tasks_version_image" "$statistics_version_image"
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: bash scripts/ci_publish.sh
 
       - name: Clean only this job's temporary resources, even on failure
         if: ${{ always() }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          import re
-          import shutil
-          import subprocess
-
-          failures = []
-
-          def docker(*arguments):
-              result = subprocess.run(["docker", *arguments], capture_output=True, text=True)
-              if result.returncode:
-                  raise RuntimeError("Docker cleanup failed; no broad deletion attempted.")
-              return result.stdout.strip()
-
-          try:
-              run_id = os.environ.get("INTEGRATION_RUN_ID", "")
-              if run_id:
-                  if not re.fullmatch(r"[0-9a-f]{32}", run_id):
-                      raise RuntimeError("Invalid run ID; refusing cleanup.")
-                  label = "pa2577.integration.run=" + run_id
-                  prefix = "pa2577-it-" + run_id
-                  containers = docker("container", "ls", "--all", "--quiet", "--filter", "label=" + label).split()
-                  for identifier in containers:
-                      try:
-                          data = json.loads(docker("container", "inspect", identifier))[0]
-                          expected_names = {"/" + prefix + "-" + service for service in ("tasks", "statistics", "postgres")}
-                          if data["Name"] not in expected_names or data["Config"]["Labels"].get("pa2577.integration.run") != run_id:
-                              raise RuntimeError("Container ownership mismatch; refusing removal.")
-                          docker("container", "rm", "--force", data["Id"])
-                      except (RuntimeError, ValueError, KeyError):
-                          failures.append("container")
-                  networks = docker("network", "ls", "--quiet", "--filter", "label=" + label).split()
-                  for identifier in networks:
-                      try:
-                          data = json.loads(docker("network", "inspect", identifier))[0]
-                          if data["Name"] != prefix or data["Labels"].get("pa2577.integration.run") != run_id or data.get("Containers"):
-                              raise RuntimeError("Network ownership mismatch or remaining members.")
-                          docker("network", "rm", data["Id"])
-                      except (RuntimeError, ValueError, KeyError):
-                          failures.append("network")
-              for variable in ("TASKS_BUILD_IMAGE", "STATISTICS_BUILD_IMAGE"):
-                  image = os.environ[variable]
-                  result = subprocess.run(["docker", "image", "inspect", image], capture_output=True)
-                  if result.returncode == 0:
-                      try:
-                          docker("image", "rm", image)
-                      except RuntimeError:
-                          failures.append("local build tag")
-          finally:
-              docker_config = os.environ.get("DOCKER_CONFIG")
-              if docker_config:
-                runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve()
-                config = Path(docker_config)
-                expected_prefix = (
-                  "pa2577-docker-" + os.environ["GITHUB_RUN_ID"] + "-"
-                  + os.environ["GITHUB_RUN_ATTEMPT"] + "-"
-                )
-                if (config.is_symlink() or config.parent.resolve() != runner_temp
-                    or not config.name.startswith(expected_prefix)):
-                  raise RuntimeError("Refusing an unexpected Docker configuration path.")
-                if config.exists():
-                  shutil.rmtree(config)
-          if failures:
-              raise SystemExit("Cleanup incomplete: " + ", ".join(failures))
-          print("Job-scoped cleanup complete. No volumes or unrelated resources were removed.")
-          PY
+        run: python3 scripts/ci_cleanup.py
 
       - name: Report tested commit
         if: ${{ success() }}
-        run: echo "CI passed for commit ${GITHUB_SHA}; use this SHA for deployment."
+        run: bash scripts/ci_report.sh

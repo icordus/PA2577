@@ -2,7 +2,7 @@
 
 This chart is prepared for Kubernetes 1.28 on the ARM64 Raspberry Pi.
 It was first deployed after explicit user approval on 2026-10-27.
-Release `pa2577`, revision 1, is deployed and passed the HTTP checks below.
+The first release, revision 1, passed the HTTP checks recorded below.
 Use release name `pa2577` and namespace `pa2577` for the names below.
 
 ## Resources
@@ -22,25 +22,22 @@ circular readiness dependency.
 
 ## Images and Versions
 
-The chart's default image tag is the fixed release version `v0.1.0`. The
-manifests also accept a full 40-character CI commit SHA. CI must publish both
-tags from the same tested image IDs; the SHA tag identifies the exact build,
-while the semantic version is easier to show during an upgrade demonstration.
+The default `imageTag` is `v0.1.0`; a full 40-character commit SHA is also accepted.
+Changing [values.yaml](values.yaml) does not update the running release.
 
-The currently installed release still runs the CI-tested SHA
-`5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`. Changing `values.yaml` does not
-change a running release. `v0.1.0` becomes available after CI runs for the Git
-tag `v0.1.0`. Use a new version for each release; CI refuses to overwrite an
-existing version tag. `imagePullPolicy: Always` pulls from Docker Hub, never
-from manually imported local images. If repositories are private, configure an
-existing registry Secret through `imagePullSecrets`.
+1. Push a new Git tag such as `v0.1.1`. CI tests the ARM64 images and publishes
+   version and SHA tags to Docker Hub. Existing version tags cannot be reused.
+2. After CI succeeds, set `imageTag` to that version and push the chart change.
+3. After approval, run **PA2577 Deploy** manually and select that branch.
 
-For a version upgrade, set `imageTag` in `values.yaml` to a new fixed version
-(for example `v0.1.1`) and push the matching Git tag to trigger CI publication.
-Then manually dispatch the separate deploy workflow; it reads `imageTag` from
-the chart on the selected branch and runs the Helm upgrade. The deploy workflow does not query
-CI status or rebuild images; Kubernetes must be able to pull the selected tag.
-Keep the SHA tag for exact build identification. Do not reuse a version tag.
+Deploy uses the selected branch's chart and scripts. It checks the existing
+cluster resources, upgrades the release with Helm, then verifies rollouts and
+HTTP endpoints. It does not build images or check CI status. The release,
+namespace, database Secret, and bound storage must already exist.
+See the [main guide](../../README.md#manual-deploy) for script roles and rollback behavior.
+
+Images use `imagePullPolicy: Always`; Kubernetes must be able to pull the tag.
+For private repositories, configure an existing Secret through `imagePullSecrets`.
 
 PostgreSQL uses `docker.io/library/postgres:17-bookworm`. Do not change its major
 version on an existing data directory without a separate migration plan.

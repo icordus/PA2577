@@ -2,7 +2,9 @@
 
 import copy
 import importlib.util
+import json
 from pathlib import Path
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -146,6 +148,110 @@ class RunnerSafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Cleanup incomplete"):
                 run.cleanup()
         docker.assert_not_called()
+
+
+class CICleanupSafetyTests(unittest.TestCase):
+    """Check extracted CI helpers without accessing a Docker daemon."""
+
+    @classmethod
+    def setUpClass(cls):
+        """Import the CI scripts without running their entry points."""
+        scripts = Path(__file__).resolve().parents[1] / "scripts"
+        for name in ("ci_cleanup", "ci_run_id"):
+            specification = importlib.util.spec_from_file_location(name, scripts / (name + ".py"))
+            module = importlib.util.module_from_spec(specification)
+            specification.loader.exec_module(module)
+            setattr(cls, name, module)
+
+    def setUp(self):
+        """Provide fake job settings and block all subprocess execution."""
+        self.run_id = "a" * 32
+        self.environment = {
+            "INTEGRATION_RUN_ID": self.run_id,
+            "TASKS_BUILD_IMAGE": "test-tasks:sha",
+            "STATISTICS_BUILD_IMAGE": "test-statistics:sha",
+            "GITHUB_RUN_ID": "123",
+            "GITHUB_RUN_ATTEMPT": "1",
+        }
+        environment = patch.dict(self.ci_cleanup.os.environ, self.environment, clear=True)
+        environment.start()
+        self.addCleanup(environment.stop)
+        subprocess = patch.object(self.ci_cleanup.subprocess, "run", return_value=SimpleNamespace(returncode=1))
+        self.process = subprocess.start()
+        self.addCleanup(subprocess.stop)
+        output = patch("sys.stdout")
+        output.start()
+        self.addCleanup(output.stop)
+
+    def test_invalid_run_id_prevents_docker_access(self):
+        """Reject invalid ownership IDs before listing or removing anything."""
+        with patch.dict(self.ci_cleanup.os.environ, {"INTEGRATION_RUN_ID": "../other"}), \
+             patch.object(self.ci_cleanup, "docker") as docker:
+            with self.assertRaisesRegex(RuntimeError, "Invalid run ID"):
+                self.ci_cleanup.main()
+        docker.assert_not_called()
+        self.process.assert_not_called()
+
+    def test_owned_container_and_empty_network_are_removed(self):
+        """Remove only resources whose names and labels match this run."""
+        prefix = "pa2577-it-" + self.run_id
+        container = {"Id": "owned-container", "Name": "/" + prefix + "-tasks",
+                     "Config": {"Labels": {LABEL: self.run_id}}}
+        network = {"Id": "owned-network", "Name": prefix,
+                   "Labels": {LABEL: self.run_id}, "Containers": {}}
+        responses = ["owned-container", json.dumps([container]), "",
+                     "owned-network", json.dumps([network]), ""]
+        with patch.object(self.ci_cleanup, "docker", side_effect=responses) as docker:
+            self.ci_cleanup.main()
+        self.assertIn(unittest.mock.call("container", "rm", "--force", "owned-container"), docker.call_args_list)
+        self.assertIn(unittest.mock.call("network", "rm", "owned-network"), docker.call_args_list)
+
+    def test_foreign_container_and_busy_network_are_preserved(self):
+        """Report mismatched ownership or active members without removing them."""
+        prefix = "pa2577-it-" + self.run_id
+        container = {"Id": "foreign", "Name": "/" + prefix + "-tasks",
+                     "Config": {"Labels": {LABEL: "another-run"}}}
+        network = {"Id": "busy", "Name": prefix, "Labels": {LABEL: self.run_id},
+                   "Containers": {"remaining-container": {}}}
+        responses = ["foreign", json.dumps([container]), "busy", json.dumps([network])]
+        with patch.object(self.ci_cleanup, "docker", side_effect=responses) as docker:
+            with self.assertRaisesRegex(SystemExit, "Cleanup incomplete"):
+                self.ci_cleanup.main()
+        self.assertFalse(any("rm" in call.args for call in docker.call_args_list))
+
+    def test_credentials_are_cleaned_when_docker_fails(self):
+        """Remove only the job credential directory even after Docker fails."""
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / "pa2577-docker-123-1-test"
+            config.mkdir()
+            with patch.dict(self.ci_cleanup.os.environ, {"RUNNER_TEMP": temporary, "DOCKER_CONFIG": str(config)}), \
+                 patch.object(self.ci_cleanup, "docker", side_effect=RuntimeError("Docker unavailable")), \
+                 patch.object(self.ci_cleanup.shutil, "rmtree") as remove:
+                with self.assertRaisesRegex(RuntimeError, "Docker unavailable"):
+                    self.ci_cleanup.main()
+                remove.assert_called_once_with(config)
+
+    def test_unexpected_credential_path_is_preserved(self):
+        """Refuse directories outside the expected job-specific name."""
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / "unrelated"
+            config.mkdir()
+            settings = {"INTEGRATION_RUN_ID": "", "RUNNER_TEMP": temporary, "DOCKER_CONFIG": str(config)}
+            with patch.dict(self.ci_cleanup.os.environ, settings), \
+                 patch.object(self.ci_cleanup.shutil, "rmtree") as remove:
+                with self.assertRaisesRegex(RuntimeError, "unexpected Docker configuration path"):
+                    self.ci_cleanup.main()
+                remove.assert_not_called()
+
+    def test_run_id_is_written_to_github_environment(self):
+        """Append a unique run ID without replacing earlier environment entries."""
+        with tempfile.TemporaryDirectory() as temporary:
+            environment = Path(temporary) / "environment"
+            environment.write_text("EXISTING=value\n")
+            with patch.dict(self.ci_run_id.os.environ, {"GITHUB_ENV": str(environment)}):
+                self.ci_run_id.main()
+            self.assertRegex(environment.read_text(), r"^EXISTING=value\nINTEGRATION_RUN_ID=[0-9a-f]{32}\n$")
+        self.process.assert_not_called()
 
 
 if __name__ == "__main__":

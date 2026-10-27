@@ -4,18 +4,9 @@ A small cloud-native task manager built for the PA2577 course. Users manage
 tasks in a browser. Two Flask microservices expose REST APIs, and PostgreSQL
 stores tasks on persistent Kubernetes storage.
 
-## Features
-
-- Create, list, complete, update, and delete tasks.
-- View total, completed, and pending task counts.
-- Store tasks in a separate PostgreSQL service.
-- Run Tasks and Statistics as independently scalable Kubernetes Deployments.
-
-This application is intentionally small and does not need replicas for its
-current workload. Scaling demonstrates the Kubernetes pattern. A future
-workload with many users and bursts of task-list/statistics requests could
-justify scaling the stateless Flask services; PostgreSQL remains a single
-instance for this project.
+Create, edit, complete, and delete tasks, with total/completed/pending counts.
+Tasks and Statistics scale separately; PostgreSQL stays at one replica.
+Scaling is a course demonstration, not a current workload requirement.
 
 ## Architecture
 
@@ -41,28 +32,13 @@ flowchart LR
 	end
 ```
 
-### Components
+- **Tasks:** browser UI, task API, and the only application access to PostgreSQL.
+- **Statistics:** calculates counts using Tasks' HTTP API; no database access.
+- **PostgreSQL:** persistent task storage on a dedicated local PV through a PVC.
+- **Helm/Kubernetes:** service discovery, probes, and separate replica settings.
 
-| Component | Responsibility |
-| --- | --- |
-| Tasks (Flask) | Serves the browser UI and task REST API. It is the only application service that accesses PostgreSQL. It proxies browser statistics requests to Statistics. |
-| Statistics (Flask) | Provides a statistics REST API. It calls Tasks over HTTP and never accesses PostgreSQL. |
-| PostgreSQL | Stores task records. It runs separately and uses a persistent volume claim. |
-| Kubernetes Services | Provide in-cluster DNS and route traffic to independently scalable Deployments. Tasks is exposed outside the cluster through NodePort 30081. |
-| Helm chart | Defines the namespace, Deployments, Services, PostgreSQL, PVC, probes, resource limits, and configurable Flask replica counts. |
-
-The statistics path is non-recursive: Browser -> Tasks statistics proxy ->
-Statistics -> Tasks `GET /api/tasks`. Tasks' list endpoint does not call
-Statistics.
-
-### Cloud Patterns
-
-- **Service decomposition:** task ownership and statistics calculation live in separate services.
-- **Service discovery:** in-cluster communication uses Kubernetes Service DNS.
-- **Stateless scaling:** Tasks and Statistics have separate replica settings; PostgreSQL remains one replica.
-- **Persistent state:** PostgreSQL uses a PVC backed by a dedicated local PV with `Retain` reclaim policy.
-- **Health-based orchestration:** Kubernetes probes gate startup, readiness, and liveness.
-- **Build once, deploy by version:** CI tests ARM64 images and publishes each tested image ID under both a fixed release tag and the full commit SHA.
+Statistics requests follow Browser -> Tasks proxy -> Statistics -> Tasks list API.
+The list endpoint does not call Statistics, so this path is not recursive.
 
 ## REST APIs
 
@@ -85,17 +61,15 @@ unavailability returns a safe HTTP 503 response.
 
 ## Local Development
 
-Run on the Raspberry Pi from the repository root. Create the virtual
-environment and install dependencies:
+On the Raspberry Pi, from the repository root:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Configure the Tasks database connection in the ignored `.env` file using the
-keys shown in `.env.example`. Never commit `.env` or paste its values into logs
-or chat. Start Tasks and Statistics in separate terminals:
+Configure the database using [.env.example](.env.example) in an ignored `.env`
+file. Never commit credentials. Start the services in separate terminals:
 
 ```bash
 .venv/bin/python services/tasks/app.py
@@ -105,29 +79,19 @@ or chat. Start Tasks and Statistics in separate terminals:
 TASKS_API_URL=http://127.0.0.1:5000 .venv/bin/python services/statistics/app.py
 ```
 
-The local development servers listen on `127.0.0.1:5000` and
-`127.0.0.1:5001`. These are development servers; the container images use
-Gunicorn.
+Development servers use `127.0.0.1:5000` and `127.0.0.1:5001`;
+container images use Gunicorn.
 
 ## Kubernetes Deployment
 
-The project is deployed with the Helm chart in [`helm/pa2577`](helm/pa2577/README.md),
-in namespace `pa2577`. Tasks is reachable on NodePort 30081. The deployed
-Tasks and Statistics images use commit `5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`:
+Helm release and namespace: `pa2577`. Tasks is exposed on NodePort 30081;
+Statistics and PostgreSQL are internal. See the [chart guide](helm/pa2577/README.md)
+for initial setup, external Secret, and persistent storage requirements.
 
-- `docker.io/icordus/pa2577-tasks:5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`
-- `docker.io/icordus/pa2577-statistics:5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`
-
-The chart default is now `v0.1.0` for a readable release tag. The already
-deployed Helm release remains on the SHA above until a later approved upgrade.
-CI publishes `v0.1.0` when the Git tag `v0.1.0` is pushed, alongside the full
-SHA tags.
-
-The first Helm deployment and HTTP checks on the Pi were reported successful.
-PostgreSQL pod recreation preserved the test task and PVC/PV identity. Pi reboot
-survival, backup/restore, access from another user's device, and performance
-under representative load have not been verified. Deployment and Helm upgrade
-commands change cluster resources; get explicit approval before running them.
+The chart defaults to image tag `v0.1.0`. Editing the chart does not change the
+running release; the image must be published before an approved Helm upgrade.
+Pi checks confirmed HTTP access and task persistence after PostgreSQL pod
+recreation. Reboot, backups, access from another device, and load remain unverified.
 
 Read-only checks:
 
@@ -141,47 +105,65 @@ curl --fail http://192.168.0.71:30081/api/statistics
 
 ## CI
 
-The GitHub Actions workflow is [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-It runs only when a Git tag matching `v*` is pushed; branch pushes and pull
-requests do not trigger it. The tag must use `vMAJOR.MINOR.PATCH`, for example
-`v0.1.0`. CI builds ARM64 images, runs isolated HTTP integration tests with
-disposable PostgreSQL, and publishes the tested image IDs under both that fixed
-version and the full commit SHA. A version tag cannot be reused. Repository
-settings required are the `DOCKERHUB_USERNAME` variable and `DOCKERHUB_TOKEN` secret.
-CI does not deploy to Kubernetes. The separate manual deploy workflow reads
-`imageTag` from the Helm chart on the selected branch, checks the cluster/PVC/Secret, upgrades
-the release, and runs read-only HTTP checks. It does not query CI status or
-rebuild images; a missing Docker Hub tag fails the rollout. The workflow is
-prepared locally but has not been run.
-In GitHub Actions, choose the branch under **Run workflow**. The workflow must
-also exist on the repository's default branch for manual dispatch to be available.
+[CI](.github/workflows/ci.yml) runs in `icordus/PA2577` when a `v*` Git tag is
+pushed. It requires `vMAJOR.MINOR.PATCH` (for example `v0.1.1`); branch pushes
+and pull requests do not trigger it. There is no manual CI trigger.
+
+1. Build the two ARM64 application images on the self-hosted runner.
+2. Test those images over HTTP with isolated, disposable PostgreSQL.
+3. Publish each tested image to Docker Hub with the version and full commit SHA tags.
+
+CI also runs offline isolation tests and cleans its temporary resources.
+It refuses to overwrite an existing version tag and **does not deploy**.
+Configure the repository variable `DOCKERHUB_USERNAME` and secret `DOCKERHUB_TOKEN`.
+
+## Manual Deploy
+
+[Deploy](.github/workflows/deploy.yml) upgrades the existing `pa2577` release;
+it is not the initial cluster setup. The runner needs Helm, kubectl, Python 3,
+the expected Kubernetes context, and access to the Pi. The namespace, release,
+database Secret, and bound PVC/PV must already exist.
+
+1. Publish a new image version through CI and confirm it succeeded.
+2. Set `imageTag` in [values.yaml](helm/pa2577/values.yaml) to that version,
+	commit it, and push the branch you want to deploy.
+3. After approval, open **Actions > PA2577 Deploy > Run workflow**, select that
+	branch, and start the workflow.
+
+Checkout uses the selected branch, including its chart and scripts; it is not
+restricted to `main`. GitHub also requires the workflow to exist on the default
+branch for manual dispatch to be available.
+
+| Script | Action |
+| --- | --- |
+| [deploy_init.sh](scripts/deploy_init.sh) | Validate image tag, cluster, storage, Secret, and chart; derive the HTTP URL. |
+| [deploy_upgrade.sh](scripts/deploy_upgrade.sh) | Run Helm upgrade with `--wait --timeout 10m --atomic`. |
+| [deploy_verify.sh](scripts/deploy_verify.sh) | Check rollouts, image tags, PVC, and HTTP endpoints without creating test data. |
+| [deploy_rollback.sh](scripts/deploy_rollback.sh) | On failure, print a manual rollback command; do not execute it. |
+
+Deploy neither rebuilds images nor queries CI status. Helm rolls back a failed
+upgrade via `--atomic`; a later verification failure needs operator review and
+does not automatically roll back. The deploy workflow has not yet been run.
 
 ## Security and Limitations
 
-- Tasks uses a dedicated PostgreSQL login with limited privileges; Statistics has no database credentials.
-- Database passwords are kept outside Git in a Kubernetes Secret. The local `.env` is ignored and owner-readable only.
-- Containers run as non-root, drop Linux capabilities, use read-only application filesystems, and have health probes.
-- NodePort uses plain HTTP and has no authentication. It is intended for a trusted lab network, not direct Internet exposure. HTTPS, user authentication, firewall policy, and backups are not configured.
-- The PVC uses a local PV on one Raspberry Pi. `Retain` helps avoid accidental reclamation, but does not protect against disk/Pi failure. Replicas on the same Pi are not high availability.
-- The CI job temporarily stores Docker login configuration in its runner temp directory and removes it during cleanup; the workflow log warned that the stored credential is not encrypted.
-- The Pi Docker socket was reported with mode `0666`; that grants local users effectively root-level Docker access and needs administrative review.
+- Tasks uses a restricted database login; Statistics has no database credentials.
+- Passwords stay in an external Kubernetes Secret or ignored local `.env`, not Git.
+- Containers use non-root users, reduced capabilities, read-only application filesystems, and probes.
+- NodePort is unauthenticated HTTP for a trusted lab network only. HTTPS, firewall policy, and backups are not configured.
+- Local storage and replicas on one Pi are not high availability; `Retain` is not a backup.
+- CI removes its temporary, unencrypted Docker login configuration during cleanup.
+- Reported Docker socket mode `0666` grants effectively root-level local access and needs administrative review.
 
 ## Benefits and Challenges
 
-The design separates task management from statistics, allows each stateless
-service to scale independently, and makes deployment repeatable with Helm and
-versioned images. The trade-offs are extra services, configuration, CI, and
-cluster operations for an application that could run as one process. A local PV
-is inexpensive and simple for a single-node course demo, but couples storage to
-one Pi. A real higher-load design would also need multiple nodes, managed/shared
-storage, authenticated HTTPS ingress, monitoring, and tested backups.
+Separate services allow independent scaling; Helm and versioned images make
+deployment repeatable. This adds operational complexity to a small application.
+A production setup would need multiple nodes, resilient storage, authenticated
+HTTPS, monitoring, and tested backups.
 
 ## Submission Video
 
-The required 5-10 minute recording is not yet attached. Suggested outline:
-
-1. Explain the app and why a hypothetical high request volume might justify scaling.
-2. Show the browser UI and task/statistics APIs.
-3. Explain Tasks, Statistics, PostgreSQL, and their HTTP/SQL responsibilities.
-4. Show the Kubernetes workloads, Services, PVC/PV, logs, and Helm templates.
-5. Demonstrate scaling and PostgreSQL pod-recreation persistence; state that reboot, external-device access, and backups remain unverified.
+The required 5-10 minute recording is not yet attached. Show the UI and APIs,
+explain the architecture, then demonstrate Kubernetes resources, logs, scaling,
+and PostgreSQL pod-recreation persistence. State the unverified limits above.
