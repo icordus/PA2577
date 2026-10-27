@@ -137,7 +137,8 @@ curl --fail http://192.168.0.71:30081/api/statistics
 ## CI
 
 The GitHub Actions workflow is [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-It runs on pushes to `main` and manual dispatch, not pull requests. It builds
+It runs only when manually dispatched from `main`; pushes and pull requests do
+not trigger it. It builds
 ARM64 images, runs isolated HTTP integration tests with disposable PostgreSQL,
 and publishes the tested image IDs with a full commit SHA. Repository settings
 required are the `DOCKERHUB_USERNAME` variable and `DOCKERHUB_TOKEN` secret.

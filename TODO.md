@@ -78,7 +78,7 @@ Reported command result: `Ran 3 tests in 20.234s`, `OK`, target `127.0.0.1:32771
 ## TODO 7 - CI Workflow (Verified, 2026-10-27)
 
 - [x] Register `pa2577-runner`; systemd enabled/active with `self-hosted`, `Linux`, `ARM64` labels; GitHub dispatched and completed a real job.
-- [x] CI runs on push to `main` and manual dispatch only, not pull requests.
+- [x] CI is manually dispatched from `main` only; pushes and pull requests do not trigger it.
 - [x] Ten offline safety tests and three isolated HTTP integration tests passed; the integration test used disposable PostgreSQL/tmpfs.
 - [x] Publish the exact tested ARM64 image IDs to Docker Hub, tagged with full commit SHA `5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`.
 - [x] Job cleanup reported completion; test containers/network/tmpfs were removed. No Kubernetes deployment occurred.
