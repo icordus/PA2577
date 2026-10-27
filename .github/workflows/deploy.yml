@@ -8,7 +8,6 @@ permissions:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, ARM64]
     timeout-minutes: 20
     defaults:
@@ -18,7 +17,7 @@ jobs:
       EXPECTED_KUBE_CONTEXT: kubernetes-admin@kubernetes
 
     steps:
-      - name: Checkout the chart from main
+      - name: Checkout the selected branch
         uses: actions/checkout@v4
         with:
           persist-credentials: false

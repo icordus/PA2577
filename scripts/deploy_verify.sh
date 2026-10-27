@@ -13,4 +13,4 @@ statistics_image="$(kubectl -n pa2577 get deployment pa2577-statistics -o jsonpa
 [[ "$(kubectl -n pa2577 get pvc pa2577-postgres-data -o jsonpath='{.status.phase}')" == "Bound" ]]
 
 python3 scripts/verify_deployment_http.py --base-url "${DEPLOY_BASE_URL:?}"
-echo "Deployed Helm chart version $DEPLOY_IMAGE_TAG from main."
+echo "Deployed Helm chart version $DEPLOY_IMAGE_TAG."

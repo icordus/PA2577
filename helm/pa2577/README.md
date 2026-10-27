@@ -38,7 +38,7 @@ existing registry Secret through `imagePullSecrets`.
 For a version upgrade, set `imageTag` in `values.yaml` to a new fixed version
 (for example `v0.1.1`) and push the matching Git tag to trigger CI publication.
 Then manually dispatch the separate deploy workflow; it reads `imageTag` from
-the chart on `main` and runs the Helm upgrade. The deploy workflow does not query
+the chart on the selected branch and runs the Helm upgrade. The deploy workflow does not query
 CI status or rebuild images; Kubernetes must be able to pull the selected tag.
 Keep the SHA tag for exact build identification. Do not reuse a version tag.
 

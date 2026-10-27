@@ -149,10 +149,12 @@ disposable PostgreSQL, and publishes the tested image IDs under both that fixed
 version and the full commit SHA. A version tag cannot be reused. Repository
 settings required are the `DOCKERHUB_USERNAME` variable and `DOCKERHUB_TOKEN` secret.
 CI does not deploy to Kubernetes. The separate manual deploy workflow reads
-`imageTag` from the Helm chart on `main`, checks the cluster/PVC/Secret, upgrades
+`imageTag` from the Helm chart on the selected branch, checks the cluster/PVC/Secret, upgrades
 the release, and runs read-only HTTP checks. It does not query CI status or
 rebuild images; a missing Docker Hub tag fails the rollout. The workflow is
 prepared locally but has not been run.
+In GitHub Actions, choose the branch under **Run workflow**. The workflow must
+also exist on the repository's default branch for manual dispatch to be available.
 
 ## Security and Limitations
 
