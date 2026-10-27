@@ -16,18 +16,25 @@ scaling the two application services independently.
 flowchart LR
 	Browser[Browser]
 	subgraph Kubernetes[Namespace: pa2577]
-		Tasks[Tasks API + UI]
-		Stats[Statistics API]
+		TasksSvc[Tasks Service]
+		Tasks["Tasks API + UI<br/>Deployment"]
+		StatsSvc[Statistics Service]
+		Stats["Statistics API<br/>Deployment"]
+		DBSvc[PostgreSQL Service]
 		DB[(PostgreSQL)]
-		Tasks -->|SQL| DB
-		Tasks -->|HTTP statistics| Stats
-		Stats -->|GET /api/tasks| Tasks
+		TasksSvc --> Tasks
+		Tasks -->|HTTP statistics| StatsSvc
+		StatsSvc --> Stats
+		Stats -->|GET /api/tasks| TasksSvc
+		Tasks -->|SQL| DBSvc
+		DBSvc --> DB
 	end
-	Browser -->|HTTP :30081| Tasks
+	Browser -->|HTTP :30081| TasksSvc
+	DB -->|PVC| PV[(Local PersistentVolume)]
 ```
 
-- **Tasks:** browser UI, task API, and the only application access to PostgreSQL.
-- **Statistics:** calculates counts using Tasks' HTTP API; no database access.
+- **Tasks:** Deployment serving the UI and task API, exposed through the Tasks Service (NodePort 30081). It is the only application component that accesses PostgreSQL.
+- **Statistics:** Deployment behind an internal Service; calculates counts using Tasks' HTTP API, with no database access.
 - **PostgreSQL:** persistent task storage on a dedicated local PV through a PVC.
 - **Helm/Kubernetes:** service discovery, probes, and separate replica settings.
 
