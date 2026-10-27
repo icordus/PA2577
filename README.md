@@ -183,9 +183,3 @@ update the vulnerable versions, run tests, and rebuild/publish images through CI
 with a new release tag. Update `imageTag`, approve the manual deploy, and verify
 the rollout and HTTP checks. Rotate any exposed credentials. Before PostgreSQL
 updates, make a verified backup and check migration requirements; never delete the PVC/PV.
-
-## Submission Video
-
-The required 5-10 minute recording is not yet attached. Show the UI and APIs,
-explain the architecture, then demonstrate Kubernetes resources, logs, scaling,
-and PostgreSQL pod-recreation persistence. State the unverified limits above.

@@ -40,7 +40,6 @@
 - [ ] After approval, deploy the new server-rendered UI and verify its browser CRUD flow.
 - [ ] Record the CI run proving how the existing `v0.1.0` tags were published; successful deployment alone does not establish provenance.
 - [ ] Record and link the required 5-10 minute video: UI, architecture, Kubernetes resources/YAML, CI/deploy, scaling, and persistence evidence.
-- [ ] Prepare likely Q&A and publish the final documentation and video link.
 
 ## Known Limitations
 
@@ -48,7 +47,6 @@
 - Pi reboot persistence, backup/restore, and representative load are untested. Native Docker database-volume recreation persistence is also unverified.
 - One Pi/local PV is not high availability, and `Retain` is not a backup. Storage preparation is in the [chart guide](helm/pa2577/README.md).
 - Unauthenticated HTTP NodePort is for the trusted lab network only; HTTPS and production firewall policy are not configured.
-- Reported Docker socket mode `0666` needs administrative review. Temporary CI Docker credentials are unencrypted until cleanup removes them.
 - Alternate-branch deploy is supported by configuration but has not been demonstrated. The revision-6 upgrade did not independently test data persistence across that upgrade.
 
 Detailed earlier reports remain in Git history. Do not treat historical evidence
