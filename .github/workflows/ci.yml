@@ -29,7 +29,6 @@ jobs:
       TASKS_BUILD_IMAGE: pa2577-ci-${{ github.run_id }}-${{ github.run_attempt }}-tasks:${{ github.sha }}
       STATISTICS_BUILD_IMAGE: pa2577-ci-${{ github.run_id }}-${{ github.run_attempt }}-statistics:${{ github.sha }}
       POSTGRES_IMAGE: docker.io/library/postgres:17-bookworm
-      DOCKER_CONFIG: ${{ runner.temp }}/pa2577-docker-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout the exact commit
@@ -41,6 +40,7 @@ jobs:
       - name: Check prerequisites and allocate an integration ID
         run: |
           set -euo pipefail
+          export DOCKER_CONFIG="$RUNNER_TEMP/pa2577-docker-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$DOCKERHUB_USERNAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]]
           case "$(uname -m)" in aarch64|arm64) ;; *) exit 1 ;; esac
@@ -49,8 +49,9 @@ jobs:
             *) echo 'A reachable Linux ARM64 Docker daemon is required.' >&2; exit 1 ;;
           esac
           command -v python3
-          mkdir -p "$DOCKER_CONFIG"
-          chmod 700 "$DOCKER_CONFIG"
+          umask 077
+          mkdir "$DOCKER_CONFIG"
+          printf 'DOCKER_CONFIG=%s\n' "$DOCKER_CONFIG" >> "$GITHUB_ENV"
           python3 - <<'PY'
           import os
           import uuid
