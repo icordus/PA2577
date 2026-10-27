@@ -75,15 +75,18 @@ Reported command result: `Ran 3 tests in 20.234s`, `OK`, target `127.0.0.1:32771
 
 - The isolated HTTP suite passed three tests on both 2026-10-26 and 2026-10-27; the latest took 20.234s. Both runs reported cleanup of only their temporary Docker network/containers and PostgreSQL tmpfs. No application database, persistent volume, Kubernetes, or PA2595 was touched.
 
-## TODO 7 - CI Workflow (Prepared; Run Pending)
+## TODO 7 - CI Workflow (Verified, 2026-10-27)
 
-- [x] Register `pa2577-runner` separately; systemd reports enabled/active with `self-hosted`, `Linux`, `ARM64` labels.
-- [x] Prepare and statically validate `.github/workflows/ci.yml`: push to `main` and manual dispatch only; no PR trigger.
-- [x] Remove the unmatched custom `pa2577` runner label locally; use the runner's three default labels.
-- [ ] Commit/push the corrected workflow; GitHub's current `main` still has the old selector requesting `pa2577`.
-- [ ] Verify runner online and run CI; test images before publishing exact image IDs with full SHA tags.
-- [ ] Configure GitHub Variable `DOCKERHUB_USERNAME` and Secret `DOCKERHUB_TOKEN` for `pa2577-tasks` and `pa2577-statistics`.
-- [ ] Confirm cleanup is job-scoped and CI never changes Kubernetes.
+- [x] Register `pa2577-runner`; systemd enabled/active with `self-hosted`, `Linux`, `ARM64` labels; GitHub dispatched and completed a real job.
+- [x] CI runs on push to `main` and manual dispatch only, not pull requests.
+- [x] Ten offline safety tests and three isolated HTTP integration tests passed; the integration test used disposable PostgreSQL/tmpfs.
+- [x] Publish the exact tested ARM64 image IDs to Docker Hub, tagged with full commit SHA `5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`.
+- [x] Job cleanup reported completion; test containers/network/tmpfs were removed. No Kubernetes deployment occurred.
+- [x] Docker Hub variable/secret are configured sufficiently for the push to succeed; keep values private.
+
+Published images: `docker.io/icordus/pa2577-tasks:5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721` (digest `sha256:19c74bcc1b9b30f970d2067604226fba9bc3b8b012f602f7f8b04a7147eaa221`) and `docker.io/icordus/pa2577-statistics:5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721` (digest `sha256:3fb3522afc2e0550fbd65e885e7db3275c30c399e09cada455c5933af35a7288`).
+
+Security note: Docker warned that login credentials were stored unencrypted in the job's temporary `DOCKER_CONFIG`; cleanup reported removing it. Document this temporary exposure and cleanup limitation in TODO 11.
 
 ## TODO 8 - Kubernetes Configuration (Not Started; Do Not Deploy)
 
