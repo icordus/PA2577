@@ -1,14 +1,9 @@
 # PA2577 Task Manager
 
-A small cloud-native task manager built for the PA2577 course. Users manage
-tasks in a browser. Two Flask microservices expose REST APIs, and PostgreSQL
-stores tasks on persistent Kubernetes storage.
-
-Create, edit, complete, and delete tasks, with total/completed/pending counts.
-Tasks and Statistics scale separately; PostgreSQL stays at one replica.
-Scaling is a course demonstration, not a current workload requirement.
-A larger workload with bursts of task-list and statistics requests could justify
-scaling the two application services independently.
+A course project with two Python/Flask services and PostgreSQL. The browser UI
+uses server-rendered Jinja templates, HTML forms, and CSS: no JavaScript or
+frontend build tools. Create, edit, complete, and delete tasks and view counters.
+Forms reload the page; the REST APIs remain available for other clients.
 
 ## Architecture
 
@@ -38,13 +33,13 @@ flowchart LR
 	Browser -->|HTTP :30081| TasksSvc
 ```
 
-- **Tasks:** Deployment serving the UI and task API, exposed through the Tasks Service (NodePort 30081). It is the only application component that accesses PostgreSQL.
-- **Statistics:** Deployment behind an internal Service; calculates counts using Tasks' HTTP API, with no database access.
-- **PostgreSQL:** single-replica Deployment behind an internal Service, storing tasks on a dedicated local PV through a PVC.
-- **Helm/Kubernetes:** service discovery, probes, and separate replica settings.
+- **Tasks:** UI and REST API; the only application access to PostgreSQL.
+- **Statistics:** counts tasks through Tasks' HTTP API; no database access.
+- **PostgreSQL:** one replica, persistent data through PVC -> local PV.
+- **Docker, Kubernetes, Helm:** application images, Services, probes, and replica settings.
 
-Statistics requests follow Browser -> Tasks proxy -> Statistics -> Tasks list API.
-The list endpoint does not call Statistics, so this path is not recursive.
+Page rendering follows Browser -> Tasks -> Statistics -> Tasks list API.
+The list API does not call Statistics, so requests do not recurse.
 
 ## REST APIs
 
@@ -94,14 +89,10 @@ Helm release and namespace: `pa2577`. Tasks is exposed on NodePort 30081;
 Statistics and PostgreSQL are internal. See the [chart guide](helm/pa2577/README.md)
 for initial setup, external Secret, and persistent storage requirements.
 
-The latest confirmed deployment is `v0.1.0`, Helm revision **6**, on 2026-10-27.
-The [deploy run](https://github.com/icordus/PA2577/actions/runs/40537098402)
-reported successful rollouts, image-tag/PVC checks, and read-only HTTP checks.
-Editing the chart alone does not update the running release.
-
-Earlier Pi checks demonstrated task persistence after PostgreSQL pod recreation.
-This Mac also verified live HTTP responses and loaded the browser UI over the LAN.
-Reboot persistence, backup/restore, and representative load remain unverified.
+Latest confirmed release: `v0.1.0`, Helm revision **6**;
+[successful deploy](https://github.com/icordus/PA2577/actions/runs/40537098402).
+The new JavaScript-free UI is a local change, not part of that verified release.
+Publish a new version and approve its deployment before demonstrating it on the Pi.
 
 Read-only checks:
 
@@ -123,8 +114,7 @@ and pull requests do not trigger it. There is no manual CI trigger.
 2. Test those images over HTTP with isolated, disposable PostgreSQL.
 3. Publish each tested image to Docker Hub with the version and full commit SHA tags.
 
-CI also runs offline isolation tests and cleans its temporary resources.
-It refuses to overwrite an existing version tag and **does not deploy**.
+CI cleans its temporary resources, refuses existing version tags, and **does not deploy**.
 
 ### Docker Hub Configuration
 
@@ -133,7 +123,7 @@ In GitHub, open **Settings > Secrets and variables > Actions** and configure:
 - **Variables > New repository variable:** `DOCKERHUB_USERNAME` = your Docker Hub username (`icordus` for this chart).
 - **Secrets > New repository secret:** `DOCKERHUB_TOKEN` = a Docker Hub personal access token with **Read & Write** permissions.
 
-Create the token in Docker Hub account settings. CI uses it to publish images; deploy does not use it.
+Create the token in Docker Hub account settings; never commit it. Deploy does not use it.
 
 Sources: [GitHub](https://github.com/icordus/PA2577).
 Images: [Tasks](https://hub.docker.com/r/icordus/pa2577-tasks) and
@@ -141,10 +131,9 @@ Images: [Tasks](https://hub.docker.com/r/icordus/pa2577-tasks) and
 
 ## Manual Deploy
 
-[Deploy](.github/workflows/deploy.yml) upgrades the existing `pa2577` release;
-it is not the initial cluster setup. The runner needs Helm, kubectl, Python 3,
-the expected Kubernetes context, and access to the Pi. The namespace, release,
-database Secret, and bound PVC/PV must already exist.
+[Deploy](.github/workflows/deploy.yml) requires the existing release, namespace,
+database Secret, and bound PVC/PV. The runner needs Helm, kubectl, Python 3,
+and the expected cluster context. Initial setup is in the chart guide.
 
 1. Publish a new image version through CI and confirm it succeeded.
 2. Set `imageTag` in [values.yaml](helm/pa2577/values.yaml) to that version,
@@ -152,47 +141,48 @@ database Secret, and bound PVC/PV must already exist.
 3. After approval, open **Actions > PA2577 Deploy > Run workflow**, select that
 	branch, and start the workflow.
 
-Checkout uses the selected branch, including its chart and scripts; it is not
-restricted to `main`. GitHub also requires the workflow to exist on the default
-branch for manual dispatch to be available.
+The selected branch supplies the chart and scripts, not necessarily `main`.
+GitHub requires the workflow on the default branch for manual dispatch.
+Deploy validates prerequisites, upgrades Helm with `--wait --timeout 10m --atomic`,
+then checks rollouts, images, PVC, and read-only HTTP responses. It does not
+rebuild images or query CI. Helm rolls back upgrade failures; later verification
+failures only print manual rollback guidance.
 
-| Script | Action |
-| --- | --- |
-| [deploy_init.sh](scripts/deploy_init.sh) | Validate image tag, cluster, storage, Secret, and chart; derive the HTTP URL. |
-| [deploy_upgrade.sh](scripts/deploy_upgrade.sh) | Run Helm upgrade with `--wait --timeout 10m --atomic`. |
-| [deploy_verify.sh](scripts/deploy_verify.sh) | Check rollouts, image tags, PVC, and HTTP endpoints without creating test data. |
-| [deploy_rollback.sh](scripts/deploy_rollback.sh) | On failure, print a manual rollback command; do not execute it. |
+## Verification and Limitations
 
-Deploy neither rebuilds images nor queries CI status. Helm rolls back a failed
-upgrade via `--atomic`; a later verification failure needs operator review and
-does not automatically roll back. The run linked above completed the upgrade
-and verification steps for `v0.1.0`.
+Run the local, mocked tests without Docker or a database:
 
-## Verification Status
+```bash
+.venv/bin/python -m unittest discover -s tests -p test_tasks_web.py -v
+.venv/bin/python -m unittest discover -s tests -p test_integration_safety.py -v
+.venv/bin/python -m unittest discover -s tests -p test_deployment_http.py -v
+```
 
-On 2026-10-27, 21 offline tests passed (16 isolation/CI safety and 5 deployment
-validator tests). Helm lint/template, Bash syntax, and workflow YAML checks passed.
-The live HTTP verifier and browser page load also passed without test-created data.
-CRUD and persistence rely on earlier Pi test reports; they were not repeated in
-this review. The older container smoke test still has an unresolved metadata
-comparison failure. See [TODO.md](TODO.md) for evidence and outstanding checks.
+Earlier Pi reports confirmed isolated HTTP integration, independent scaling,
+and persistence after PostgreSQL pod recreation. The new UI passed 38 local
+tests and browser CRUD checks with JavaScript disabled and simulated dependencies;
+3 live-test suites were intentionally skipped. See [TODO.md](TODO.md) for
+pending deployment checks and the unresolved legacy smoke-test failure.
 
-## Security and Limitations
+- Restricted database login, external Secrets, non-root containers, and read-only application filesystems.
+- Browser forms require a matching Origin; the JSON APIs remain unauthenticated.
+- NodePort uses HTTP without authentication: trusted lab network only.
+- One Pi and a local PV are not high availability; `Retain` is not a backup.
+- Reboot persistence, backup/restore, and representative load remain unverified.
+- CI removes temporary Docker credentials during cleanup; never commit credentials.
 
-- Tasks uses a restricted database login; Statistics has no database credentials.
-- Passwords stay in an external Kubernetes Secret or ignored local `.env`, not Git.
-- Containers use non-root users, reduced capabilities, read-only application filesystems, and probes.
-- NodePort is unauthenticated HTTP for a trusted lab network only. HTTPS, firewall policy, and backups are not configured.
-- Local storage and replicas on one Pi are not high availability; `Retain` is not a backup.
-- CI removes its temporary, unencrypted Docker login configuration during cleanup.
+Separate services demonstrate independent scaling and repeatable deployment,
+but add complexity. This small app does not need replicas; bursts of requests
+could justify them. One Pi is inexpensive, while production would need resilient
+storage, multiple nodes, authenticated HTTPS, monitoring, and backups.
 
-## Benefits and Challenges
+## Maintenance and Security
 
-Separate services allow independent scaling; Helm and versioned images make
-deployment repeatable. This adds operational complexity to a small application.
-A single Pi keeps hardware costs low but provides no node-level failover.
-A production setup would need multiple nodes, resilient storage, authenticated
-HTTPS, monitoring, and tested backups.
+Monitor security advisories for dependencies and container images. When affected,
+update the vulnerable versions, run tests, and rebuild/publish images through CI
+with a new release tag. Update `imageTag`, approve the manual deploy, and verify
+the rollout and HTTP checks. Rotate any exposed credentials. Before PostgreSQL
+updates, make a verified backup and check migration requirements; never delete the PVC/PV.
 
 ## Submission Video
 

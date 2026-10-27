@@ -6,38 +6,66 @@
   <meta name="theme-color" content="#155d47">
   <title>Task Manager | PA2577</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='tasks.css') }}">
-  <script src="{{ url_for('static', filename='tasks.js') }}" defer></script>
 </head>
 <body>
   <main>
     <header class="page-header">
       <div><p class="eyebrow">PA2577 / WORKSPACE</p><h1>Task Manager<span class="title-dot">.</span></h1></div>
-      <button id="refresh" type="button" class="secondary">Refresh</button>
+      <form action="{{ url_for('index') }}" method="get">
+        <button id="refresh" type="submit" class="secondary">Refresh</button>
+      </form>
     </header>
 
     <section aria-label="Task statistics" class="summary">
       <dl>
-        <div><dt>Total</dt><dd id="total">--</dd></div>
-        <div><dt>Completed</dt><dd id="completed">--</dd></div>
-        <div><dt>Pending</dt><dd id="pending">--</dd></div>
+        <div><dt>Total</dt><dd id="total">{{ counts.total if counts else '--' }}</dd></div>
+        <div><dt>Completed</dt><dd id="completed">{{ counts.completed if counts else '--' }}</dd></div>
+        <div><dt>Pending</dt><dd id="pending">{{ counts.pending if counts else '--' }}</dd></div>
       </dl>
     </section>
 
     <section class="composer" aria-labelledby="add-heading">
       <h2 id="add-heading">New task</h2>
-      <form id="task-form">
+      <form id="task-form" action="{{ url_for('create_task_form') }}" method="post">
         <div class="input-group"><label for="task-title">Title</label><input id="task-title" name="title" type="text" maxlength="200" required autocomplete="off"></div>
         <button id="add-task" type="submit">Add task</button>
       </form>
     </section>
 
-    <p id="feedback" role="status" aria-live="polite"></p>
-    <div id="errors" role="alert" hidden></div>
+    {% if errors %}
+    <div id="errors" role="alert">
+      {% for error in errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+    {% endif %}
 
-    <section class="task-section" aria-labelledby="tasks-heading" aria-busy="true">
-      <div class="section-heading"><h2 id="tasks-heading">Tasks</h2><span id="list-count"></span></div>
-      <p id="empty-state">Loading tasks...</p>
-      <ul id="task-list" aria-label="Tasks"></ul>
+    <section class="task-section" aria-labelledby="tasks-heading">
+      <div class="section-heading">
+        <h2 id="tasks-heading">Tasks</h2>
+        <span id="list-count">{% if tasks is not none %}{{ tasks|length }} task{{ '' if tasks|length == 1 else 's' }}{% endif %}</span>
+      </div>
+      {% if tasks is none %}
+      <p id="empty-state">Tasks could not be loaded.</p>
+      {% elif not tasks %}
+      <p id="empty-state">No tasks yet.</p>
+      {% endif %}
+      <ul id="task-list" aria-label="Tasks">
+        {% for task in tasks or [] %}
+        <li class="task{{ ' is-completed' if task.completed else '' }}">
+          <form class="task-edit" action="{{ url_for('update_task_form', task_id=task.id) }}" method="post">
+            <div class="input-group">
+              <label for="title-{{ task.id }}">Title</label>
+              <input class="task-title" id="title-{{ task.id }}" name="title" type="text" value="{{ task.title }}" maxlength="200" required>
+              <time class="task-date" datetime="{{ task.created_at }}">{{ task.created_at[:16]|replace('T', ' ') }} UTC</time>
+            </div>
+            <label class="completion"><input name="completed" type="checkbox"{% if task.completed %} checked{% endif %}> Completed</label>
+            <button type="submit" class="secondary">Save</button>
+          </form>
+          <form class="task-delete" action="{{ url_for('delete_task_form', task_id=task.id) }}" method="post">
+            <button type="submit" class="delete-task" aria-label="Delete {{ task.title }}">Delete</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
     </section>
     <footer>PA2577 <span>Tasks / Statistics</span></footer>
   </main>

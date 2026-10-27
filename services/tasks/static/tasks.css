@@ -40,18 +40,20 @@ form { display: flex; gap: 12px; align-items: flex-end; margin-top: 16px; }
 .input-group { flex: 1; min-width: 0; }
 label { display: block; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
 input[type="text"] { display: block; width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #91a99e; border-radius: 4px; background: var(--paper); color: var(--ink); }
-#feedback { min-height: 20px; margin: 8px 0 16px; font-size: 13px; color: var(--green); }
 #errors { border-left: 3px solid var(--red); background: #fff0f0; padding: 12px 14px; margin: 0 0 20px; color: #84212b; font-size: 14px; overflow-wrap: anywhere; }
 #errors p { margin: 4px 0; }
 .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 2px solid var(--ink); }
 #list-count { font-size: 12px; color: var(--muted); }
 #empty-state { color: var(--muted); padding: 24px 0; }
 #task-list { list-style: none; padding: 0; margin: 0; }
-.task { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.task { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.task form { margin: 0; }
+.task-edit { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
+.completion { display: flex; align-items: center; gap: 8px; margin: 0; }
 .task input[type="checkbox"] { width: 22px; height: 22px; margin: 0; accent-color: var(--green); cursor: pointer; }
 .task-title { margin: 0; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
 .task.is-completed .task-title { color: var(--muted); text-decoration: line-through; }
-.task-date { font-size: 11px; color: var(--muted); margin: 5px 0 0; }
+.task-date { display: block; font-size: 11px; color: var(--muted); margin: 5px 0 0; }
 .delete-task { background: transparent; color: var(--red); border-color: transparent; font-size: 13px; padding: 10px 12px; }
 .delete-task:hover:not(:disabled) { background: #ffe9e9; }
 footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
@@ -66,6 +68,9 @@ footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 4
   form { flex-wrap: wrap; }
   .input-group { flex-basis: 100%; }
   form button { width: 100%; }
-  .task { column-gap: 10px; grid-template-columns: 22px minmax(0, 1fr) auto; }
+  .task { column-gap: 10px; grid-template-columns: minmax(0, 1fr); }
+  .task-edit { grid-template-columns: minmax(0, 1fr) auto; }
+  .task-edit .input-group { grid-column: 1 / -1; }
+  .task-delete { justify-self: end; }
   .delete-task { padding-inline: 8px; }
 }

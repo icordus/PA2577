@@ -1,4 +1,4 @@
-"""Serve the task API, web page, and statistics proxy."""
+"""Serve the REST API and a server-rendered task page."""
 
 import json
 import os
@@ -10,13 +10,21 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import psycopg
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 from psycopg.rows import dict_row
 
 
 # Keep existing environment values when loading local settings.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 app = Flask(__name__)
+FORM_ENDPOINTS = {"create_task_form", "update_task_form", "delete_task_form"}
+
+
+@app.before_request
+def protect_forms():
+    """Reject form submissions that do not originate from this application."""
+    if request.endpoint in FORM_ENDPOINTS and request.headers.get("Origin") != request.host_url.rstrip("/"):
+        abort(403)
 
 
 class DatabaseConfigurationError(Exception):
@@ -125,6 +133,10 @@ def serialize(task):
 def validate_payload(partial=False):
     """Check task fields and trim the title when it is present."""
     payload = request.get_json(silent=True)
+    if request.endpoint == "create_task_form":
+        payload = {"title": request.form.get("title", "")}
+    elif request.endpoint == "update_task_form":
+        payload = {"title": request.form.get("title", ""), "completed": request.form.get("completed") == "on"}
     if not isinstance(payload, dict) or not payload:
         return None, "Expected a non-empty JSON object."
     if payload.keys() - {"title", "completed"}:
@@ -147,13 +159,44 @@ def validate_payload(partial=False):
 def database_unavailable(error):
     """Hide database details and return a safe unavailable response."""
     app.logger.warning("Tasks database operation failed.")
+    if request.endpoint in FORM_ENDPOINTS:
+        return render_tasks_page(error="Database unavailable.", status=503)
     return jsonify(error="Database unavailable."), 503
+
+
+def render_tasks_page(error=None, status=200):
+    """Render tasks and upstream statistics, retaining safe service errors."""
+    errors = [error] if error else []
+    tasks = None
+    try:
+        tasks = list_tasks().get_json()
+    except (psycopg.Error, DatabaseConfigurationError):
+        if "Database unavailable." not in errors:
+            errors.append("Database unavailable.")
+        status = 503
+    statistics = app.make_response(statistics_proxy())
+    counts = statistics.get_json()
+    if statistics.status_code != 200:
+        errors.append(counts["error"])
+        counts = None
+    return render_template("index.html", tasks=tasks, counts=counts, errors=errors), status
+
+
+def task_response(data=None, status=200, headers=None):
+    """Return API JSON or redirect a successful browser form to the page."""
+    if request.endpoint in FORM_ENDPOINTS:
+        if status >= 400:
+            return render_tasks_page(error=data["error"], status=status)
+        return redirect(url_for("index"), code=303)
+    if status == 204:
+        return "", 204
+    return jsonify(data), status, headers or {}
 
 
 @app.get("/")
 def index():
-    """Serve the Task Manager web page."""
-    return render_template("index.html")
+    """Show the current task list and statistics without JavaScript."""
+    return render_tasks_page()
 
 
 @app.get("/health")
@@ -176,28 +219,30 @@ def list_tasks():
     return jsonify([serialize(task) for task in tasks])
 
 
+@app.post("/tasks/create", endpoint="create_task_form")
 @app.post("/api/tasks")
 def create_task():
     """Validate and save a new task."""
     payload, error = validate_payload()
     if error:
-        return jsonify(error=error), 400
+        return task_response({"error": error}, 400)
     task = query(
         "INSERT INTO tasks.tasks (title, completed) VALUES (%s, %s) "
         "RETURNING id, title, completed, created_at",
         (payload["title"], payload.get("completed", False)),
     )
-    return jsonify(serialize(task)), 201, {"Location": url_for("update_task", task_id=task["id"])}
+    return task_response(serialize(task), 201, {"Location": url_for("update_task", task_id=task["id"])})
 
 
+@app.post("/tasks/<int:task_id>/update", endpoint="update_task_form")
 @app.patch("/api/tasks/<int:task_id>")
 def update_task(task_id):
     """Update the supplied fields of an existing task."""
     payload, error = validate_payload(partial=True)
     if error:
-        return jsonify(error=error), 400
+        return task_response({"error": error}, 400)
     if task_id > 9223372036854775807:
-        return jsonify(error="Task not found."), 404
+        return task_response({"error": "Task not found."}, 404)
     # Leave each field unchanged when it is not supplied.
     task = query(
         "UPDATE tasks.tasks SET title = COALESCE(%s, title), "
@@ -206,19 +251,20 @@ def update_task(task_id):
         (payload.get("title"), payload.get("completed"), task_id),
     )
     if task is None:
-        return jsonify(error="Task not found."), 404
-    return jsonify(serialize(task))
+        return task_response({"error": "Task not found."}, 404)
+    return task_response(serialize(task))
 
 
+@app.post("/tasks/<int:task_id>/delete", endpoint="delete_task_form")
 @app.delete("/api/tasks/<int:task_id>")
 def delete_task(task_id):
     """Delete one task or return not found."""
     if task_id > 9223372036854775807:
-        return jsonify(error="Task not found."), 404
+        return task_response({"error": "Task not found."}, 404)
     task = query("DELETE FROM tasks.tasks WHERE id = %s RETURNING id", (task_id,))
     if task is None:
-        return jsonify(error="Task not found."), 404
-    return "", 204
+        return task_response({"error": "Task not found."}, 404)
+    return task_response(status=204)
 
 
 if __name__ == "__main__":
