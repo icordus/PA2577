@@ -7,6 +7,8 @@ stores tasks on persistent Kubernetes storage.
 Create, edit, complete, and delete tasks, with total/completed/pending counts.
 Tasks and Statistics scale separately; PostgreSQL stays at one replica.
 Scaling is a course demonstration, not a current workload requirement.
+A larger workload with bursts of task-list and statistics requests could justify
+scaling the two application services independently.
 
 ## Architecture
 
@@ -88,10 +90,14 @@ Helm release and namespace: `pa2577`. Tasks is exposed on NodePort 30081;
 Statistics and PostgreSQL are internal. See the [chart guide](helm/pa2577/README.md)
 for initial setup, external Secret, and persistent storage requirements.
 
-The chart defaults to image tag `v0.1.0`. Editing the chart does not change the
-running release; the image must be published before an approved Helm upgrade.
-Pi checks confirmed HTTP access and task persistence after PostgreSQL pod
-recreation. Reboot, backups, access from another device, and load remain unverified.
+The latest confirmed deployment is `v0.1.0`, Helm revision **6**, on 2026-10-27.
+The [deploy run](https://github.com/icordus/PA2577/actions/runs/40537098402)
+reported successful rollouts, image-tag/PVC checks, and read-only HTTP checks.
+Editing the chart alone does not update the running release.
+
+Earlier Pi checks demonstrated task persistence after PostgreSQL pod recreation.
+This Mac also verified live HTTP responses and loaded the browser UI over the LAN.
+Reboot persistence, backup/restore, and representative load remain unverified.
 
 Read-only checks:
 
@@ -116,6 +122,10 @@ and pull requests do not trigger it. There is no manual CI trigger.
 CI also runs offline isolation tests and cleans its temporary resources.
 It refuses to overwrite an existing version tag and **does not deploy**.
 Configure the repository variable `DOCKERHUB_USERNAME` and secret `DOCKERHUB_TOKEN`.
+
+Sources: [GitHub](https://github.com/icordus/PA2577).
+Images: [Tasks](https://hub.docker.com/r/icordus/pa2577-tasks) and
+[Statistics](https://hub.docker.com/r/icordus/pa2577-statistics).
 
 ## Manual Deploy
 
@@ -143,7 +153,17 @@ branch for manual dispatch to be available.
 
 Deploy neither rebuilds images nor queries CI status. Helm rolls back a failed
 upgrade via `--atomic`; a later verification failure needs operator review and
-does not automatically roll back. The deploy workflow has not yet been run.
+does not automatically roll back. The run linked above completed the upgrade
+and verification steps for `v0.1.0`.
+
+## Verification Status
+
+On 2026-10-27, 21 offline tests passed (16 isolation/CI safety and 5 deployment
+validator tests). Helm lint/template, Bash syntax, and workflow YAML checks passed.
+The live HTTP verifier and browser page load also passed without test-created data.
+CRUD and persistence rely on earlier Pi test reports; they were not repeated in
+this review. The older container smoke test still has an unresolved metadata
+comparison failure. See [TODO.md](TODO.md) for evidence and outstanding checks.
 
 ## Security and Limitations
 
@@ -159,6 +179,7 @@ does not automatically roll back. The deploy workflow has not yet been run.
 
 Separate services allow independent scaling; Helm and versioned images make
 deployment repeatable. This adds operational complexity to a small application.
+A single Pi keeps hardware costs low but provides no node-level failover.
 A production setup would need multiple nodes, resilient storage, authenticated
 HTTPS, monitoring, and tested backups.
 

@@ -51,6 +51,7 @@ PostgreSQL container/volume persistence across recreation or reboot remains unve
 - [x] Browser calls only Tasks; Tasks proxies Statistics, which calls Tasks' list endpoint. No recursion.
 - [x] Titles rendered as text; useful API errors shown.
 - [x] Remote agent reports browser CRUD flow verified. Detailed browser transcript was not included in this Mac session.
+- [x] On 2026-10-27, this Mac opened the deployed UI over the LAN; tasks and counters loaded. This was not a new CRUD test.
 
 ## TODO 5 - ARM64 Images and Smoke Tests (Partial)
 
@@ -75,18 +76,19 @@ Reported command result: `Ran 3 tests in 20.234s`, `OK`, target `127.0.0.1:32771
 
 - The isolated HTTP suite passed three tests on both 2026-10-26 and 2026-10-27; the latest took 20.234s. Both runs reported cleanup of only their temporary Docker network/containers and PostgreSQL tmpfs. No application database, persistent volume, Kubernetes, or PA2595 was touched.
 
-## TODO 7 - CI Workflow (Tag Trigger Prepared Locally)
+## TODO 7 - CI Workflow (Implemented; Tag-Run Evidence Pending)
 
 - [x] Register `pa2577-runner`; systemd enabled/active with `self-hosted`, `Linux`, `ARM64` labels; GitHub dispatched and completed a real job.
 - [x] Previously verified workflow built and tested ARM64 images and published SHA tags.
-- [ ] Switch CI to trigger only on Git tags `v*`; validate semantic version format and keep branch pushes/PRs from triggering it.
-- [x] Ten offline safety tests and three isolated HTTP integration tests passed; the integration test used disposable PostgreSQL/tmpfs.
+- [x] Configure CI to trigger only on Git tags `v*`, validate semantic version format, and exclude branch pushes/PRs; checked against workflow YAML and scripts.
+- [x] Extract Bash/Python blocks into documented `scripts/ci_*` helpers; retain login after tests and cleanup with `always()`.
+- [x] Original CI run passed ten offline safety tests and three isolated HTTP integration tests with disposable PostgreSQL/tmpfs. The current offline safety suite passes 16 tests after extraction.
 - [x] Publish the exact tested ARM64 image IDs to Docker Hub, tagged with full commit SHA `5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`.
-- [ ] Validate and publish this workflow change; push Git tag `v0.1.0` to publish the tested images with both the version and full SHA tags.
+- [ ] Record the successful tag-triggered CI run and version/SHA image references for `v0.1.0`. Its deployment proves the version images are available, not how they were published; do not reuse the version tag.
 - [x] Job cleanup reported completion; test containers/network/tmpfs were removed. No Kubernetes deployment occurred.
 - [x] Docker Hub variable/secret are configured sufficiently for the push to succeed; keep values private.
 
-Published images: `docker.io/icordus/pa2577-tasks:5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721` (digest `sha256:19c74bcc1b9b30f970d2067604226fba9bc3b8b012f602f7f8b04a7147eaa221`) and `docker.io/icordus/pa2577-statistics:5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721` (digest `sha256:3fb3522afc2e0550fbd65e885e7db3275c30c399e09cada455c5933af35a7288`).
+Historically published SHA images: `docker.io/icordus/pa2577-tasks:5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721` (digest `sha256:19c74bcc1b9b30f970d2067604226fba9bc3b8b012f602f7f8b04a7147eaa221`) and `docker.io/icordus/pa2577-statistics:5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721` (digest `sha256:3fb3522afc2e0550fbd65e885e7db3275c30c399e09cada455c5933af35a7288`). These are not a digest verification of the currently deployed `v0.1.0` tags.
 
 Security note: Docker warned that login credentials were stored unencrypted in the job's temporary `DOCKER_CONFIG`; cleanup reported removing it. Document this temporary exposure and cleanup limitation in TODO 11.
 
@@ -99,19 +101,32 @@ Security note: Docker warned that login credentials were stored unencrypted in t
 - [x] After explicit approval, create namespace and external Secret, then install release `pa2577` revision 1. All three Deployments were 1/1 Ready; PVC bound to the dedicated PV.
 - [x] Verify probes, service DNS, image digests, PostgreSQL initialization, and that Tasks connects as non-superuser `pa2577_tasks`.
 - [x] Verify HTTP UI/health/readiness/CRUD/statistics/validation via `http://192.168.0.71:30081`; only the uniquely marked test record was deleted.
-- [ ] Confirm browser access from the user's device and evaluate resource budgets under representative load.
+- [x] Confirm browser access from this Mac to the Pi NodePort; the UI loaded tasks and counters on 2026-10-27.
+- [ ] Evaluate resource budgets under representative load.
 - [x] In TODO 10, demonstrate independent scaling and persistence after PostgreSQL pod recreation; results are recorded below.
 - [ ] Verify persistence after a separately approved Pi reboot; no reboot has been performed.
-- [ ] Publish fixed image tag `v0.1.0` through CI, then separately approve and demonstrate a Helm upgrade using the fixed tag. Current release remains on the existing SHA.
+- [x] User ran the manual deploy workflow with `v0.1.0`; Helm revision 6 and all rollout/image/PVC/HTTP checks passed. CI publication evidence is tracked separately in TODO 7.
 
 Storage and deployment actions above were separately approved by the user. The existing Docker PostgreSQL/volume, native Flask services, PA2595, and other namespaces were not modified. The local PV's 2 Gi capacity is not a disk quota; alternatives and Secret details are documented in `helm/pa2577/README.md`. No credentials or kubeconfig are in the chart. Evidence is from the Pi agent report; this Mac did not independently run Helm/Kubernetes checks.
 
-## TODO 9 - Manual Helm Deployment Workflow (Prepared Locally; Not Run)
+## TODO 9 - Manual Helm Deployment Workflow (Verified per Actions Logs, 2026-10-27)
 
 - [x] Prepare manual `.github/workflows/deploy.yml` to read `imageTag` from `helm/pa2577/values.yaml`; no input SHA or CI API dependency.
 - [x] Preflight the expected Pi context, namespace, PVC, external Secret, and chart render; upgrade only release `pa2577`, wait for rollouts, and run read-only HTTP checks.
 - [x] Use `helm upgrade --install --atomic`; document manual rollback for failures after the Helm operation.
-- [ ] Commit/push the workflow, verify runner access in Actions, and execute only after explicit approval. CI is separate; unavailable images cause the rollout to fail.
+- [x] Workflow is published and was manually run by the user; runner access and the upgrade/verification steps succeeded.
+- [x] Allow dispatch from the selected branch, not only `main`; checkout uses that branch's chart and scripts. Alternate-branch execution has not been demonstrated.
+- [x] Fix `kubectl version` parsing to use supported JSON output instead of JSONPath; validate with a simulated server response and the subsequent successful deploy run.
+
+Evidence: [Actions run 40537098402](https://github.com/icordus/PA2577/actions/runs/40537098402), job `122305190044`, reported release `pa2577`, namespace `pa2577`, status `deployed`, revision **6**, image version **v0.1.0**. Tasks, Statistics, and PostgreSQL rolled out successfully; image-tag/PVC checks and read-only HTTP validation passed. Counters were 0/0/0 at verification time, not a permanent expected state. This run did not independently test persistence across the upgrade. CI remains separate; deploy does not query CI status or rebuild images.
+
+### Readiness Review (2026-10-27)
+
+- [x] This Mac passed 16 offline isolation/CI safety tests and 5 deployment-validator tests.
+- [x] Helm lint and template rendering passed for Kubernetes 1.28.15; all CI/deploy Bash scripts and both workflow YAML files passed syntax checks.
+- [x] Live read-only HTTP verification passed for `/health`, `/ready`, `/api/tasks`, and `/api/statistics`; the browser UI also loaded over the LAN.
+- Local limitations: Flask, psycopg, and python-dotenv are absent from this Mac's checked interpreter; the local Node executable cannot start because an ICU library is missing. Full application tests and the Node syntax check were not completed here. No dependencies or infrastructure were changed.
+- The review did not rerun CRUD, Docker integration, scaling, or persistence mutations. Earlier Pi evidence remains separate from these read-only checks.
 
 ## TODO 10 - Demonstration (Cluster Checks Verified; Video Pending)
 
@@ -150,7 +165,7 @@ Storage and deployment actions above were separately approved by the user. The e
 	task, PVC/PV, persistent data, Docker volume, native service, other namespace,
 	or PA2595 resource was removed or modified. No Pi reboot, sudo, commit, push,
 	CI execution, or deployment-workflow change occurred.
-- Final state: release pa2577 deployed, revision 5; Tasks/Statistics/PostgreSQL
+- State at the end of this scaling demonstration, before the later revision 6 upgrade: release pa2577 deployed, revision 5; Tasks/Statistics/PostgreSQL
 	each 1/1 Ready, effective Helm replica values 1/1, PV/PVC Bound, /ready 200,
 	and statistics matching task data. The video and reboot checks remain pending.
 
@@ -186,12 +201,13 @@ or change credentials. This has not been executed. Multiple replicas on this
 single Pi improve process-level availability, not protection against loss of
 the Pi, disk, power, or network. A retained local PV is not a backup.
 
-Stop after TODO 10; do not begin TODO 11 without user direction.
+## TODO 11 - Submission Documentation (In Progress; Video Pending)
 
-## TODO 11 - Submission Documentation (Not Started)
-
-- [ ] Update README with setup/configuration, component responsibilities, APIs, and a Mermaid architecture diagram.
-- [ ] Include GitHub/Docker Hub links; discuss benefits, challenges, costs, complexity, scaling, and availability.
-- [ ] Document security and limitations: authentication, HTTPS, network access, secrets, backups.
-- [ ] Acknowledge this app does not need scaling; describe a hypothetical workload that would.
-- [ ] Prepare a concise presentation outline and likely Q&A on architecture, business trade-offs, service interaction, deployment, and security; never claim an unverified result.
+- [x] README covers setup/configuration, component responsibilities, APIs, and a Mermaid architecture diagram.
+- [x] Include GitHub/Docker Hub links and discuss benefits, challenges, costs, complexity, scaling, and availability.
+- [x] Document security and limitations: authentication, HTTPS, network access, secrets, backups.
+- [x] Acknowledge that this app does not need scaling and describe a hypothetical larger workload.
+- [x] Synchronize README/TODO with revision 6 deployment evidence and the read-only readiness review; retain historical reports and unverified limitations.
+- [x] Include a concise video outline in README.
+- [ ] Prepare likely Q&A on architecture, business trade-offs, service interaction, deployment, and security.
+- [ ] Record and attach the required 5-10 minute video (also tracked in TODO 10).
