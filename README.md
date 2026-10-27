@@ -16,22 +16,14 @@ scaling the two application services independently.
 flowchart LR
 	Browser[Browser]
 	subgraph Kubernetes[Namespace: pa2577]
-		TasksSvc[Tasks Service]
-		Tasks[Tasks Flask Deployment]
-		StatsSvc[Statistics Service]
-		Stats[Statistics Flask Deployment]
-		DBsvc[PostgreSQL Service]
-		DB[PostgreSQL Deployment]
-		PVC[(PersistentVolumeClaim)]
-		Browser -->|HTTP NodePort 30081| TasksSvc
-		TasksSvc --> Tasks
-		Tasks -->|SQL| DBsvc
-		DBsvc --> DB
-		DB --> PVC
-		Tasks -->|HTTP statistics proxy| StatsSvc
-		StatsSvc --> Stats
-		Stats -->|GET /api/tasks| TasksSvc
+		Tasks[Tasks API + UI]
+		Stats[Statistics API]
+		DB[(PostgreSQL)]
+		Tasks -->|SQL| DB
+		Tasks -->|HTTP statistics| Stats
+		Stats -->|GET /api/tasks| Tasks
 	end
+	Browser -->|HTTP :30081| Tasks
 ```
 
 - **Tasks:** browser UI, task API, and the only application access to PostgreSQL.
