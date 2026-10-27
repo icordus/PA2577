@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-publish:
+    runs-on: [self-hosted, linux, ARM64]
+    timeout-minutes: 30
+    env:
+      TASKS_IMAGE: pa2577-tasks:${{ github.sha }}
+      STATISTICS_IMAGE: pa2577-statistics:${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify ARM64 Docker runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]]
+          [[ "$(docker info --format '{{.OSType}}/{{.Architecture}}')" == "linux/arm64" ]]
+          docker version
+          python3 --version
+
+      - name: Run offline safety tests
+        shell: bash
+        run: python3 -m unittest discover -s tests -p test_integration_safety.py -v
+
+      - name: Build ARM64 application images
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/arm64 --tag "$TASKS_IMAGE" --file services/tasks/Dockerfile .
+          docker build --platform linux/arm64 --tag "$STATISTICS_IMAGE" --file services/statistics/Dockerfile .
+          [[ "$(docker image inspect "$TASKS_IMAGE" --format '{{.Os}}/{{.Architecture}}')" == "linux/arm64" ]]
+          [[ "$(docker image inspect "$STATISTICS_IMAGE" --format '{{.Os}}/{{.Architecture}}')" == "linux/arm64" ]]
+          echo "tasks_id=$(docker image inspect "$TASKS_IMAGE" --format '{{.Id}}')" >> "$GITHUB_OUTPUT"
+          echo "statistics_id=$(docker image inspect "$STATISTICS_IMAGE" --format '{{.Id}}')" >> "$GITHUB_OUTPUT"
+        id: build
+
+      - name: Pull isolated PostgreSQL test image
+        shell: bash
+        run: docker pull --platform linux/arm64 docker.io/library/postgres:17-bookworm
+
+      - name: Run isolated HTTP integration tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/integration_http.py --execute \
+            --tasks-image "$TASKS_IMAGE" \
+            --statistics-image "$STATISTICS_IMAGE" \
+            --postgres-image docker.io/library/postgres:17-bookworm
+
+      - name: Publish tested images to Docker Hub
+        if: ${{ github.ref == 'refs/heads/main' }}
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKER_CONFIG: ${{ runner.temp }}/pa2577-docker-${{ github.run_id }}-${{ github.run_attempt }}
+          TASKS_IMAGE_ID: ${{ steps.build.outputs.tasks_id }}
+          STATISTICS_IMAGE_ID: ${{ steps.build.outputs.statistics_id }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$DOCKERHUB_USERNAME" || -z "$DOCKERHUB_TOKEN" ]]; then
+            echo '::error::Configure the DOCKERHUB_USERNAME variable and DOCKERHUB_TOKEN secret.'
+            exit 1
+          fi
+          umask 077
+          mkdir "$DOCKER_CONFIG"
+          printf '%s' "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+
+          tasks_repository="${DOCKERHUB_USERNAME}/pa2577-tasks"
+          statistics_repository="${DOCKERHUB_USERNAME}/pa2577-statistics"
+          tasks_release="${tasks_repository}:${GITHUB_SHA}"
+          statistics_release="${statistics_repository}:${GITHUB_SHA}"
+
+          [[ "$(docker image inspect "$TASKS_IMAGE" --format '{{.Id}}')" == "$TASKS_IMAGE_ID" ]]
+          [[ "$(docker image inspect "$STATISTICS_IMAGE" --format '{{.Id}}')" == "$STATISTICS_IMAGE_ID" ]]
+          docker tag "$TASKS_IMAGE" "$tasks_release"
+          docker tag "$STATISTICS_IMAGE" "$statistics_release"
+          [[ "$(docker image inspect "$tasks_release" --format '{{.Id}}')" == "$TASKS_IMAGE_ID" ]]
+          [[ "$(docker image inspect "$statistics_release" --format '{{.Id}}')" == "$STATISTICS_IMAGE_ID" ]]
+          docker push "$tasks_release"
+          docker push "$statistics_release"
+          echo "Validated and published images for commit ${GITHUB_SHA}"
+
+      - name: Remove temporary Docker Hub credentials
+        if: ${{ always() }}
+        shell: bash
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/pa2577-docker-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          if [[ -d "$DOCKER_CONFIG" ]]; then
+            rm -f "$DOCKER_CONFIG/config.json"
+            rmdir "$DOCKER_CONFIG"
+          fi
+
+      - name: Report tested commit
+        if: ${{ success() }}
+        shell: bash
+        run: echo "CI passed for commit ${GITHUB_SHA}; use this SHA for deployment."
