@@ -71,15 +71,26 @@ Security note: Pi report says Docker socket permissions were changed to `0666`; 
 
 Reported command result: `Ran 3 tests in 20.234s`, `OK`, target `127.0.0.1:32771`. Existing native services, PostgreSQL container, and `pa2577-postgres-data` were not accessed or changed. Evidence is from the Pi-agent report, not an independent run on this Mac.
 
-## TODO 7 - CI Workflow (Not Started)
+### Recorded Pi Integration Runs
 
-- [x] Register PA2577 self-hosted runner `pa2577-runner` in its own directory; systemd reports `enabled` and `active` (user terminal output).
-- [ ] Confirm runner is online in GitHub and execute a real PA2577 CI job.
-- [ ] Add `.github/workflows/ci.yml` for pushes to `main` and manual runs; never execute external PR code on the personal runner.
+- The isolated HTTP suite passed three tests on both 2026-10-26 and 2026-10-27; the latest took 20.234s. Both runs reported cleanup of only their temporary Docker network/containers and PostgreSQL tmpfs. No application database, persistent volume, Kubernetes, or PA2595 was touched.
+
+## TODO 7 - CI Workflow (Prepared Locally; Not Yet Published or Run)
+
+- [x] Register `pa2577-runner` in a separate directory; systemd reports enabled/active with `self-hosted`, `Linux`, `ARM64` labels.
+- [x] Prepare and statically validate `.github/workflows/ci.yml`; it triggers on push to `main` and manual dispatch, not pull requests, and uses the runner's three default labels.
+- [ ] Resolve the remaining `TODO.md` merge conflict, then publish the corrected workflow to `main`; the current GitHub workflow still requests the unmatched `pa2577` label.
+- [ ] Verify runner online status and run a real CI job; publish tested SHA-tagged images only after integration tests pass.
+- [ ] Configure GitHub Variable `DOCKERHUB_USERNAME` and Secret `DOCKERHUB_TOKEN` with access to both image repositories.
+- [ ] Verify job cleanup and confirm CI makes no Kubernetes changes.
 - [ ] Build ARM64 images and run isolated HTTP tests using only workflow-owned resources, without Compose or conflicts with app data.
 - [ ] Publish the exact tested images to Docker Hub only after tests pass, tagged with the full commit SHA.
 - [ ] Store Docker Hub credentials in GitHub Secrets/Variables; clean only workflow resources and print deployable SHA.
 - [ ] Verify CI. CI must not deploy to Kubernetes.
+
+Required repository Variable: `DOCKERHUB_USERNAME`. Required Secret: `DOCKERHUB_TOKEN` with publication rights for `pa2577-tasks` and `pa2577-statistics`. No credentials are committed. The runner must be authorized for PA2577 and have labels `self-hosted`, `linux`, `ARM64`, `pa2577`; existing PA2595/PA2579 registrations were not changed.
+
+The runner script accepts an optional validated `--run-id` for job-scoped fallback cleanup. CI builds each image once, tests by image ID, publishes those same IDs with full commit SHA tags, and uses `always()` cleanup. No CI workflow has been executed or images published by CI. Runner-host failure can still prevent cleanup and requires a separate recovery decision, never broad prune.
 
 ## TODO 8 - Kubernetes Configuration (Not Started; Do Not Deploy)
 

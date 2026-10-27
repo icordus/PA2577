@@ -3,6 +3,7 @@
 import copy
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -119,6 +120,20 @@ class RunnerSafetyTests(unittest.TestCase):
             self.assertEqual(self.runner.main([]), 0)
         docker.assert_not_called()
         generate.assert_not_called()
+
+    def test_explicit_run_id_is_used_without_docker_calls(self):
+        """Use the job ID so fallback cleanup can find only its resources."""
+        with patch.object(self.runner, "docker") as docker:
+            run = self.runner.IsolatedRun(SimpleNamespace(run_id="b" * 32))
+        self.assertEqual(run.run_id, "b" * 32)
+        self.assertEqual(run.network, "pa2577-it-" + "b" * 32)
+        docker.assert_not_called()
+
+    def test_invalid_run_id_is_rejected_before_resource_creation(self):
+        """Reject IDs that could select another resource name."""
+        for run_id in ("pa2577-postgres", "../native", "A" * 32, "c" * 31):
+            with self.subTest(run_id=run_id), self.assertRaises(ValueError):
+                self.runner.IsolatedRun(SimpleNamespace(run_id=run_id))
 
     def test_cleanup_refuses_container_with_wrong_run_label(self):
         """Refuse to remove a container labeled for another run."""

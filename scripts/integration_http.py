@@ -38,7 +38,9 @@ class IsolatedRun:
     def __init__(self, arguments):
         """Create a unique run ID without starting any resources."""
         self.arguments = arguments
-        self.run_id = uuid.uuid4().hex
+        self.run_id = getattr(arguments, "run_id", None) or uuid.uuid4().hex
+        require(len(self.run_id) == 32 and all(character in "0123456789abcdef" for character in self.run_id),
+            "Run ID must contain exactly 32 lowercase hexadecimal characters.")
         self.network = "pa2577-it-" + self.run_id
         self.network_id = None
         self.containers = {}
@@ -185,6 +187,7 @@ def main(argv=None):
     parser.add_argument("--tasks-image", default="pa2577-tasks:todo5-smoke")
     parser.add_argument("--statistics-image", default="pa2577-statistics:todo5-smoke")
     parser.add_argument("--postgres-image", default="docker.io/library/postgres:17-bookworm")
+    parser.add_argument("--run-id", help="Unique 32-character hex ID for job-owned resource cleanup.")
     parser.add_argument("--base-url", help="Optional target override; must match this run's inspected loopback binding.")
     arguments = parser.parse_args(argv)
     if not arguments.execute:
