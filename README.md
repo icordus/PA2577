@@ -185,7 +185,6 @@ comparison failure. See [TODO.md](TODO.md) for evidence and outstanding checks.
 - NodePort is unauthenticated HTTP for a trusted lab network only. HTTPS, firewall policy, and backups are not configured.
 - Local storage and replicas on one Pi are not high availability; `Retain` is not a backup.
 - CI removes its temporary, unencrypted Docker login configuration during cleanup.
-- Reported Docker socket mode `0666` grants effectively root-level local access and needs administrative review.
 
 ## Benefits and Challenges
 
