@@ -40,18 +40,35 @@ jobs:
       - name: Check prerequisites and allocate an integration ID
         run: |
           set -euo pipefail
-          export DOCKER_CONFIG="$RUNNER_TEMP/pa2577-docker-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$DOCKERHUB_USERNAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]]
-          case "$(uname -m)" in aarch64|arm64) ;; *) exit 1 ;; esac
+          if [[ ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::GITHUB_SHA is not a full 40-character commit SHA.'
+            exit 1
+          fi
+          if [[ -z "${DOCKERHUB_USERNAME:-}" ]]; then
+            echo '::error::Set the repository variable DOCKERHUB_USERNAME.'
+            exit 1
+          fi
+          if [[ ! "$DOCKERHUB_USERNAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+            echo '::error::DOCKERHUB_USERNAME has an invalid format.'
+            exit 1
+          fi
+          case "$(uname -m)" in
+            aarch64|arm64) ;;
+            *) echo '::error::The self-hosted runner must be Linux ARM64.' >&2; exit 1 ;;
+          esac
           case "$(docker info --format '{{.OSType}}/{{.Architecture}}')" in
             linux/aarch64|linux/arm64) ;;
             *) echo 'A reachable Linux ARM64 Docker daemon is required.' >&2; exit 1 ;;
           esac
-          command -v python3
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo '::error::python3 is required on the self-hosted runner.'
+            exit 1
+          fi
           umask 077
-          mkdir "$DOCKER_CONFIG"
+          DOCKER_CONFIG="$(mktemp -d "$RUNNER_TEMP/pa2577-docker-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-XXXXXX")"
+            export DOCKER_CONFIG
           printf 'DOCKER_CONFIG=%s\n' "$DOCKER_CONFIG" >> "$GITHUB_ENV"
+            chmod 700 "$DOCKER_CONFIG"
           python3 - <<'PY'
           import os
           import uuid
@@ -168,13 +185,18 @@ jobs:
                       except RuntimeError:
                           failures.append("local build tag")
           finally:
-              expected = Path(os.environ["RUNNER_TEMP"]) / (
-                  "pa2577-docker-" + os.environ["GITHUB_RUN_ID"] + "-" + os.environ["GITHUB_RUN_ATTEMPT"]
-              )
-              config = Path(os.environ["DOCKER_CONFIG"])
-              if config != expected or config.is_symlink():
+              docker_config = os.environ.get("DOCKER_CONFIG")
+              if docker_config:
+                runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve()
+                config = Path(docker_config)
+                expected_prefix = (
+                  "pa2577-docker-" + os.environ["GITHUB_RUN_ID"] + "-"
+                  + os.environ["GITHUB_RUN_ATTEMPT"] + "-"
+                )
+                if (config.is_symlink() or config.parent.resolve() != runner_temp
+                    or not config.name.startswith(expected_prefix)):
                   raise RuntimeError("Refusing an unexpected Docker configuration path.")
-              if config.exists():
+                if config.exists():
                   shutil.rmtree(config)
           if failures:
               raise SystemExit("Cleanup incomplete: " + ", ".join(failures))
