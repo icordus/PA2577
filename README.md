@@ -22,7 +22,7 @@ flowchart LR
 			StatsSvc[Statistics Service]
 			Stats["Statistics API<br/>Deployment"]
 			DBSvc[PostgreSQL Service]
-			DB[(PostgreSQL)]
+			DB["PostgreSQL<br/>Deployment"]
 			PVC[PersistentVolumeClaim]
 			TasksSvc --> Tasks
 			Tasks -->|HTTP statistics| StatsSvc
@@ -40,7 +40,7 @@ flowchart LR
 
 - **Tasks:** Deployment serving the UI and task API, exposed through the Tasks Service (NodePort 30081). It is the only application component that accesses PostgreSQL.
 - **Statistics:** Deployment behind an internal Service; calculates counts using Tasks' HTTP API, with no database access.
-- **PostgreSQL:** persistent task storage on a dedicated local PV through a PVC.
+- **PostgreSQL:** single-replica Deployment behind an internal Service, storing tasks on a dedicated local PV through a PVC.
 - **Helm/Kubernetes:** service discovery, probes, and separate replica settings.
 
 Statistics requests follow Browser -> Tasks proxy -> Statistics -> Tasks list API.
