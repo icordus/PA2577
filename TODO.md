@@ -90,13 +90,13 @@ Security note: Docker warned that login credentials were stored unencrypted in t
 
 ## TODO 8 - Kubernetes Configuration (Not Started; Do Not Deploy)
 
-- [ ] Use namespace `pa2577`; deploy the self-developed Tasks and Statistics services plus separate PostgreSQL/PVC.
+- [ ] Create a minimal Helm chart (for example `helm/pa2577`) for namespace `pa2577`, with Tasks and Statistics Deployments/Services and separate PostgreSQL/PVC resources.
 - [ ] Inspect StorageClasses/PVs first; explain Pi preparation and obtain approval before infrastructure changes.
 - [ ] Use a Kubernetes Secret for the database password, readiness/liveness probes, and suitable CPU/memory requests/limits.
 - [ ] Expose the UI/API from outside the cluster using an available Service/NodePort; verify browser access.
-- [ ] Allow independent horizontal scaling of both Flask Deployments; keep PostgreSQL at one instance.
+- [ ] Make both Flask replica counts independently configurable in Helm values; keep PostgreSQL at one instance.
 - [ ] Pull application images from Docker Hub using full-SHA tags; never rely on manually imported images.
-- [ ] Validate manifests against the existing Kubernetes API version. Do not deploy in this stage.
+- [ ] Validate with `helm lint` and `helm template` against the existing Kubernetes API version. Do not install/upgrade the release in this stage.
 
 ## TODO 9 - Deployment Workflow (Not Started)
 
