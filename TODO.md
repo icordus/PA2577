@@ -57,7 +57,7 @@ PostgreSQL container/volume persistence across recreation or reboot remains unve
 - [x] Tasks and Statistics images built for Linux ARM64, Gunicorn, non-root UID/GID 10001, image healthchecks.
 - [x] Reported isolated loopback HTTP/health checks passed; no Compose used.
 - [ ] Repair and rerun `scripts/smoke_containers.py`: its final PostgreSQL metadata comparison failed although container ID/start time were unchanged and restart count was zero. Cause remains unknown.
-- [ ] Complete integration/persistence verification through Kubernetes in TODO 8/9.
+- [x] Verify full application integration and PostgreSQL persistence through Kubernetes (deployment and pod-recreation evidence in TODO 8/10).
 
 Security note: Pi report says Docker socket permissions were changed to `0666`; this gives local users effectively root-level Docker control. The agent did not make that change. Review separately; do not change permissions automatically.
 
