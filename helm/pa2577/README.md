@@ -81,8 +81,9 @@ above, and node affinity `kubernetes.io/hostname=raspberrypi2`.
 The PV was initially `Available`, reserved for `pa2577/pa2577-postgres-data`.
 After the separately approved deployment, the PVC and PV are `Bound`, and
 PostgreSQL initialized the new data directory successfully. Tasks CRUD passed
-against that database. Persistence after PostgreSQL pod recreation/reboot and
-backup/restore have not been tested. Existing Docker data was never reused.
+against that database. The approved TODO 10 test later verified persistence
+across PostgreSQL pod recreation with unchanged PVC/PV UIDs. Persistence after
+a Pi reboot and backup/restore remain untested. Existing Docker data was never reused.
 The capacity field is not an enforced filesystem quota or reserved disk space.
 
 The PV definition is outside `templates/`, so the Helm chart does not create,
@@ -149,8 +150,9 @@ dependencies return safe errors instead of requiring a startup-order hack.
 Default requests are 300m CPU and 448 MiB RAM total at one replica per service;
 limits total 2 CPUs and 960 MiB RAM. Initial rollout, image pulls, probes, volume
 mounting, database initialization, and service DNS passed. All three pods were
-1/1 Ready with zero observed restarts. Resource suitability under load, browser
-access from another device, and persistence after pod recreation remain untested.
+1/1 Ready with zero observed restarts. Resource suitability under load and browser
+access from another device remain unverified. The approved TODO 10 scaling and
+pod-recreation checks are recorded below; no reboot was performed.
 
 ## First Deployment Verification
 
@@ -182,6 +184,29 @@ curl --fail-with-body http://192.168.0.71:30081/api/statistics
 Expected: deployed release, available workloads, Bound storage, readiness
 {"status":"ok"}, and counters matching the current task list.
 
+## Approved Scaling and Persistence Demonstration
+
+On 2026-10-27, after explicit approval and a read-only comparison with the
+installed chart, Tasks was scaled to two replicas alone (Helm revision 2) and
+returned to one (revision 3). Statistics was then scaled to two alone (revision 4)
+and returned to one (revision 5). Rollouts and HTTP readiness/statistics checks
+passed at each two-replica stage; PostgreSQL remained at one replica.
+
+A uniquely marked API task with ID 2 survived deletion and controller recreation
+of only the PA2577 PostgreSQL pod. Its complete returned representation was
+unchanged. PVC/PV UIDs and binding were unchanged. The test deleted only its own
+task afterward and verified statistics returned to their original counts.
+
+The final release is deployed at revision 5, with Tasks/Statistics replica values
+1/1 and all three Deployments 1/1 Ready. See the repository TODO.md for pod and
+storage UID evidence. No native service, existing Docker volume, other namespace,
+or PA2595 data was changed. Do not repeat these mutations without approval.
+
+A future reboot test needs a new retained test task and separate approval before
+the user reboots the Pi. After node/service readiness, compare the task and
+PVC/PV identities and delete only that task. No reboot test or backup recovery
+has been performed; single-node replicas do not protect against failure of the Pi.
+
 ## Local Validation Only
 
 Run from the repository root:
@@ -192,8 +217,9 @@ helm template pa2577 helm/pa2577 --namespace pa2577 --kube-version 1.28.15
 ```
 
 Independent scaling values were also linted/rendered with
-`--set tasks.replicaCount=2 --set statistics.replicaCount=3`. No live scaling
-occurred. Rendering checks templates, not live API admission or runtime behavior.
+`--set tasks.replicaCount=2 --set statistics.replicaCount=3`. These local checks
+were followed by the separately approved live demonstration described above.
+Rendering alone checks templates, not live API admission or runtime behavior.
 The chart intentionally targets the inspected 1.28 series; it does not upgrade it.
 
 Do not install, upgrade, apply rendered output, provision storage, or create

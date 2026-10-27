@@ -92,13 +92,14 @@ Security note: Docker warned that login credentials were stored unencrypted in t
 
 - [x] Inspect storage: no StorageClass/PV/PVC existed; after separate approval, prepare `/var/lib/pa2577/postgresql` (0700, UID/GID 999) and create local PV `pa2577-postgres-pv` (2 Gi, Retain, RWO, node-affinity to raspberrypi2).
 - [x] Create `helm/pa2577` with Tasks/Statistics Deployments and Services, one PostgreSQL Deployment, PVC, init ConfigMap, external Secret reference, probes, non-root/read-only security contexts, and resource limits.
-- [x] Make Tasks and Statistics replicas independently configurable; Helm lint/template passed for defaults and overrides (2/3 replicas). No scaling deployment was performed.
+- [x] Make Tasks and Statistics replicas independently configurable; Helm lint/template passed for defaults and overrides (2/3 replicas). No live scaling occurred during TODO 8; the approved live demonstration is recorded in TODO 10.
 - [x] Use CI-published full-SHA images; verify Tasks NodePort 30081 was free before use. Existing NodePorts 30080/31674 were unchanged.
 - [x] After explicit approval, create namespace and external Secret, then install release `pa2577` revision 1. All three Deployments were 1/1 Ready; PVC bound to the dedicated PV.
 - [x] Verify probes, service DNS, image digests, PostgreSQL initialization, and that Tasks connects as non-superuser `pa2577_tasks`.
 - [x] Verify HTTP UI/health/readiness/CRUD/statistics/validation via `http://192.168.0.71:30081`; only the uniquely marked test record was deleted.
 - [ ] Confirm browser access from the user's device and evaluate resource budgets under representative load.
-- [ ] In TODO 10, demonstrate independent scaling and persistence after PostgreSQL pod recreation/reboot. These remain untested.
+- [x] In TODO 10, demonstrate independent scaling and persistence after PostgreSQL pod recreation; results are recorded below.
+- [ ] Verify persistence after a separately approved Pi reboot; no reboot has been performed.
 
 Storage and deployment actions above were separately approved by the user. The existing Docker PostgreSQL/volume, native Flask services, PA2595, and other namespaces were not modified. The local PV's 2 Gi capacity is not a disk quota; alternatives and Secret details are documented in `helm/pa2577/README.md`. No credentials or kubeconfig are in the chart. Evidence is from the Pi agent report; this Mac did not independently run Helm/Kubernetes checks.
 
@@ -109,12 +110,80 @@ Storage and deployment actions above were separately approved by the user. The e
 - [ ] Wait for rollout/readiness, run HTTP checks, fail on verification errors, and document rollback.
 - [x] Obtain explicit confirmation before the first manual Helm deployment (recorded in TODO 8); the deployment workflow is still not implemented and its first execution needs separate approval.
 
-## TODO 10 - Demonstration (Not Started)
+## TODO 10 - Demonstration (Cluster Checks Verified; Video Pending)
 
-- [ ] Separately scale Tasks and Statistics to two replicas and verify each.
-- [ ] Demonstrate task persistence across PostgreSQL pod recreation without deleting the PVC/data; explain reboot verification.
-- [ ] Explain that replicas on one Pi do not protect against failure of that Pi.
+- [x] Separately scale Tasks and Statistics to two replicas through Helm and verify each rollout and HTTP behavior.
+- [x] Return each Flask service to one replica before continuing; verify final effective Helm values Tasks=1 and Statistics=1.
+- [x] Demonstrate task persistence across PostgreSQL pod recreation without deleting PVC/PV or data; clean up only the test-created task.
+- [x] Explain reboot verification and why replicas on one Pi do not protect against failure of that Pi.
+- [ ] Perform a separately approved reboot persistence test; it was explained only, not executed.
 - [ ] Record a 5-10 minute video: application idea, service roles/API calls, Kubernetes deployment, browser UI, logs, and a brief walkthrough of Kubernetes YAML.
+
+### Approved Cluster Demonstration (2026-10-27)
+
+- Before mutations, checked Helm status, workloads, Services, PVC/PV, effective
+	replica values, and the PostgreSQL pod identity. The local chart matched the
+	installed manifests; local scaling renders changed only the chosen Deployment's
+	replicaCount. The user explicitly approved steps 1-3 and both returns to one.
+- Tasks scaling: Helm revision 2 set tasks.replicaCount=2; Tasks was 2/2 Ready
+	while Statistics/PostgreSQL stayed 1/1. HTTP /ready returned 200 and statistics
+	matched the task list. Revision 3 returned Tasks to 1/1.
+- Statistics scaling: revision 4 set statistics.replicaCount=2; Statistics was
+	2/2 Ready while Tasks/PostgreSQL stayed 1/1. HTTP statistics matched task data.
+	Revision 5 returned Statistics to 1/1. All upgrades used --reuse-values,
+	--wait and --timeout 5m, without image rebuilds or changing the database schema.
+- Persistence test created one unique pa2577-persistence-<UUID> task through
+	the deployed API and retained task ID 2 and its full returned representation.
+	The old pod name and UID were verified immediately before deleting only
+	pa2577/pa2577-postgres-67dc8cfcdc-gtdvx (UID
+	408d00e9-7090-472c-ad54-9594254ecd8b). Its controller created
+	pa2577-postgres-67dc8cfcdc-gmhgb (UID bdba9251-05d5-4591-a140-4175959c0fc7).
+- Waited for the replacement pod Ready, PostgreSQL rollout, and Tasks /ready.
+	The complete saved task representation remained in GET /api/tasks, and
+	statistics included it. PVC UID 5f4d905b-38cb-49cf-a502-fa7bb3da079a and
+	PV UID 429c8e59-3862-4bd0-b578-21ce8bf9fcdd were unchanged and remained Bound.
+- Deleted only task ID 2, confirmed its unique marker was absent, and verified
+	counters returned to the original 0 total, 0 completed, 0 pending. No existing
+	task, PVC/PV, persistent data, Docker volume, native service, other namespace,
+	or PA2595 resource was removed or modified. No Pi reboot, sudo, commit, push,
+	CI execution, or deployment-workflow change occurred.
+- Final state: release pa2577 deployed, revision 5; Tasks/Statistics/PostgreSQL
+	each 1/1 Ready, effective Helm replica values 1/1, PV/PVC Bound, /ready 200,
+	and statistics matching task data. The video and reboot checks remain pending.
+
+Approved scaling commands used, with a successful rollout and HTTP check before
+each return to one replica:
+
+```bash
+helm upgrade pa2577 helm/pa2577 -n pa2577 --reuse-values --set tasks.replicaCount=2 --wait --timeout 5m
+helm upgrade pa2577 helm/pa2577 -n pa2577 --reuse-values --set tasks.replicaCount=1 --wait --timeout 5m
+helm upgrade pa2577 helm/pa2577 -n pa2577 --reuse-values --set statistics.replicaCount=2 --wait --timeout 5m
+helm upgrade pa2577 helm/pa2577 -n pa2577 --reuse-values --set statistics.replicaCount=1 --wait --timeout 5m
+```
+
+These are historical commands, not approval for another run. Read-only checks:
+
+```bash
+helm status pa2577 -n pa2577
+kubectl -n pa2577 get deployments,pods,pvc
+kubectl get pv pa2577-postgres-pv
+curl --fail http://192.168.0.71:30081/ready
+curl --fail http://192.168.0.71:30081/api/statistics
+```
+
+Expected final state: three 1/1 Ready Deployments, PV/PVC Bound, readiness
+{"status":"ok"}, and statistics matching the current tasks, not necessarily
+zero if the user later adds tasks.
+
+For a future reboot test, obtain separate approval, create a new uniquely marked
+task through the API, and retain its ID and returned fields before the user
+reboots the Pi. After the node/services are Ready, verify the same PVC/PV identity
+and task representation, then delete only that test task. Do not delete storage
+or change credentials. This has not been executed. Multiple replicas on this
+single Pi improve process-level availability, not protection against loss of
+the Pi, disk, power, or network. A retained local PV is not a backup.
+
+Stop after TODO 10; do not begin TODO 11 without user direction.
 
 ## TODO 11 - Submission Documentation (Not Started)
 
