@@ -106,12 +106,12 @@ Security note: Docker warned that login credentials were stored unencrypted in t
 
 Storage and deployment actions above were separately approved by the user. The existing Docker PostgreSQL/volume, native Flask services, PA2595, and other namespaces were not modified. The local PV's 2 Gi capacity is not a disk quota; alternatives and Secret details are documented in `helm/pa2577/README.md`. No credentials or kubeconfig are in the chart. Evidence is from the Pi agent report; this Mac did not independently run Helm/Kubernetes checks.
 
-## TODO 9 - Deployment Workflow (Not Started)
+## TODO 9 - Manual Helm Deployment Workflow (Prepared Locally; Not Run)
 
-- [ ] Add manual `.github/workflows/deploy.yml` requiring a commit SHA whose CI passed; use that commit's Helm chart/values and images without rebuilding.
-- [ ] Verify runner cluster access; scope changes to namespace `pa2577` except explicitly approved cluster-wide storage preparation.
-- [ ] Wait for rollout/readiness, run HTTP checks, fail on verification errors, and document rollback.
-- [x] Obtain explicit confirmation before the first manual Helm deployment (recorded in TODO 8); the deployment workflow is still not implemented and its first execution needs separate approval.
+- [x] Prepare manual `.github/workflows/deploy.yml` to read `imageTag` from `helm/pa2577/values.yaml`; no input SHA or CI API dependency.
+- [x] Preflight the expected Pi context, namespace, PVC, external Secret, and chart render; upgrade only release `pa2577`, wait for rollouts, and run read-only HTTP checks.
+- [x] Use `helm upgrade --install --atomic`; document manual rollback for failures after the Helm operation.
+- [ ] Commit/push the workflow, verify runner access in Actions, and execute only after explicit approval. CI is separate; unavailable images cause the rollout to fail.
 
 ## TODO 10 - Demonstration (Cluster Checks Verified; Video Pending)
 

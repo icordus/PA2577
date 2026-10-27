@@ -1,0 +1,37 @@
+name: PA2577 Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, ARM64]
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      EXPECTED_KUBE_CONTEXT: kubernetes-admin@kubernetes
+
+    steps:
+      - name: Checkout the chart from main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate version and target cluster
+        run: bash scripts/deploy_init.sh
+
+      - name: Upgrade Helm release to the imageTag in values.yaml
+        run: bash scripts/deploy_upgrade.sh
+
+      - name: Wait for workloads and verify images and storage
+        run: bash scripts/deploy_verify.sh
+
+      - name: Show manual rollback command
+        if: ${{ failure() }}
+        run: bash scripts/deploy_rollback.sh

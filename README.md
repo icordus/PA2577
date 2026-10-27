@@ -148,7 +148,11 @@ requests do not trigger it. The tag must use `vMAJOR.MINOR.PATCH`, for example
 disposable PostgreSQL, and publishes the tested image IDs under both that fixed
 version and the full commit SHA. A version tag cannot be reused. Repository
 settings required are the `DOCKERHUB_USERNAME` variable and `DOCKERHUB_TOKEN` secret.
-CI does not deploy to Kubernetes. Deployment workflow automation remains TODO.
+CI does not deploy to Kubernetes. The separate manual deploy workflow reads
+`imageTag` from the Helm chart on `main`, checks the cluster/PVC/Secret, upgrades
+the release, and runs read-only HTTP checks. It does not query CI status or
+rebuild images; a missing Docker Hub tag fails the rollout. The workflow is
+prepared locally but has not been run.
 
 ## Security and Limitations
 

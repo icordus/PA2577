@@ -35,9 +35,12 @@ existing version tag. `imagePullPolicy: Always` pulls from Docker Hub, never
 from manually imported local images. If repositories are private, configure an
 existing registry Secret through `imagePullSecrets`.
 
-For an approved version upgrade, push a new Git tag such as `v0.1.1` to trigger
-CI, then set `imageTag` to that version in the Helm upgrade. Keep the SHA tag
-for exact rollback/reproduction. Do not reuse a version tag.
+For a version upgrade, set `imageTag` in `values.yaml` to a new fixed version
+(for example `v0.1.1`) and push the matching Git tag to trigger CI publication.
+Then manually dispatch the separate deploy workflow; it reads `imageTag` from
+the chart on `main` and runs the Helm upgrade. The deploy workflow does not query
+CI status or rebuild images; Kubernetes must be able to pull the selected tag.
+Keep the SHA tag for exact build identification. Do not reuse a version tag.
 
 PostgreSQL uses `docker.io/library/postgres:17-bookworm`. Do not change its major
 version on an existing data directory without a separate migration plan.
