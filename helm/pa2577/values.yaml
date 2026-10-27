@@ -1,7 +1,7 @@
 namespace: pa2577
 
-# Use the full commit SHA whose images passed CI, not latest.
-imageTag: "5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721"
+# Fixed release tag. CI also publishes the immutable full commit SHA tag.
+imageTag: "v0.1.0"
 imagePullSecrets: []
 
 tasks:

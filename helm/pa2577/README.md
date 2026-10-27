@@ -20,18 +20,24 @@ Tasks proxies browser statistics requests to Statistics without changing its
 task-list endpoint. Statistics health does not depend on Tasks, avoiding a
 circular readiness dependency.
 
-## Images
+## Images and Versions
 
-The default Tasks and Statistics Docker Hub tag is the full CI commit SHA:
+The chart's default image tag is the fixed release version `v0.1.0`. The
+manifests also accept a full 40-character CI commit SHA. CI must publish both
+tags from the same tested image IDs; the SHA tag identifies the exact build,
+while the semantic version is easier to show during an upgrade demonstration.
 
-`5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`
+The currently installed release still runs the CI-tested SHA
+`5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`. Changing `values.yaml` does not
+change a running release. `v0.1.0` becomes available only after CI is manually
+dispatched with that version. Use a new version for each release; CI refuses to
+overwrite an existing version tag. `imagePullPolicy: Always` pulls from Docker
+Hub, never from manually imported local images. If repositories are private,
+configure an existing registry Secret through `imagePullSecrets`.
 
-The repository checklist reports that these exact ARM64 images passed CI and
-were published. The running Tasks/Statistics image digests were subsequently
-verified to match the published digests. CI was not repeated for deployment.
-`imagePullPolicy: Always` requires registry pulls, never manual image imports.
-If the repositories are private, supply an existing registry Secret name through
-`imagePullSecrets`; do not store registry credentials in chart values.
+For an approved version upgrade, first publish the new version through CI, then
+set `imageTag` to that version in the Helm upgrade. Keep the SHA tag for exact
+rollback/reproduction. Do not reuse a version tag.
 
 PostgreSQL uses `docker.io/library/postgres:17-bookworm`. Do not change its major
 version on an existing data directory without a separate migration plan.

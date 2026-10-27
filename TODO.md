@@ -81,6 +81,7 @@ Reported command result: `Ran 3 tests in 20.234s`, `OK`, target `127.0.0.1:32771
 - [x] CI is manually dispatched from `main` only; pushes and pull requests do not trigger it.
 - [x] Ten offline safety tests and three isolated HTTP integration tests passed; the integration test used disposable PostgreSQL/tmpfs.
 - [x] Publish the exact tested ARM64 image IDs to Docker Hub, tagged with full commit SHA `5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`.
+- [ ] After CI version-input changes are committed, manually publish the same tested image IDs as fixed tag `v0.1.0`; keep the SHA tags and never overwrite an existing version tag.
 - [x] Job cleanup reported completion; test containers/network/tmpfs were removed. No Kubernetes deployment occurred.
 - [x] Docker Hub variable/secret are configured sufficiently for the push to succeed; keep values private.
 
@@ -93,13 +94,14 @@ Security note: Docker warned that login credentials were stored unencrypted in t
 - [x] Inspect storage: no StorageClass/PV/PVC existed; after separate approval, prepare `/var/lib/pa2577/postgresql` (0700, UID/GID 999) and create local PV `pa2577-postgres-pv` (2 Gi, Retain, RWO, node-affinity to raspberrypi2).
 - [x] Create `helm/pa2577` with Tasks/Statistics Deployments and Services, one PostgreSQL Deployment, PVC, init ConfigMap, external Secret reference, probes, non-root/read-only security contexts, and resource limits.
 - [x] Make Tasks and Statistics replicas independently configurable; Helm lint/template passed for defaults and overrides (2/3 replicas). No live scaling occurred during TODO 8; the approved live demonstration is recorded in TODO 10.
-- [x] Use CI-published full-SHA images; verify Tasks NodePort 30081 was free before use. Existing NodePorts 30080/31674 were unchanged.
+- [x] Initial release uses CI-published full-SHA images; Tasks NodePort 30081 was free before use. Existing NodePorts 30080/31674 were unchanged.
 - [x] After explicit approval, create namespace and external Secret, then install release `pa2577` revision 1. All three Deployments were 1/1 Ready; PVC bound to the dedicated PV.
 - [x] Verify probes, service DNS, image digests, PostgreSQL initialization, and that Tasks connects as non-superuser `pa2577_tasks`.
 - [x] Verify HTTP UI/health/readiness/CRUD/statistics/validation via `http://192.168.0.71:30081`; only the uniquely marked test record was deleted.
 - [ ] Confirm browser access from the user's device and evaluate resource budgets under representative load.
 - [x] In TODO 10, demonstrate independent scaling and persistence after PostgreSQL pod recreation; results are recorded below.
 - [ ] Verify persistence after a separately approved Pi reboot; no reboot has been performed.
+- [ ] Publish fixed image tag `v0.1.0` through CI, then separately approve and demonstrate a Helm upgrade using the fixed tag. Current release remains on the existing SHA.
 
 Storage and deployment actions above were separately approved by the user. The existing Docker PostgreSQL/volume, native Flask services, PA2595, and other namespaces were not modified. The local PV's 2 Gi capacity is not a disk quota; alternatives and Secret details are documented in `helm/pa2577/README.md`. No credentials or kubeconfig are in the chart. Evidence is from the Pi agent report; this Mac did not independently run Helm/Kubernetes checks.
 

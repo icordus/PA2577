@@ -2,6 +2,11 @@ name: PA2577 CI
 
 on:
   workflow_dispatch:
+    inputs:
+      image_version:
+        description: "New immutable release tag, e.g. v0.1.0; use a new version for each release"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -23,6 +28,7 @@ jobs:
         shell: bash
     env:
       DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+      IMAGE_VERSION: ${{ inputs.image_version }}
       TASKS_BUILD_IMAGE: pa2577-ci-${{ github.run_id }}-${{ github.run_attempt }}-tasks:${{ github.sha }}
       STATISTICS_BUILD_IMAGE: pa2577-ci-${{ github.run_id }}-${{ github.run_attempt }}-statistics:${{ github.sha }}
       POSTGRES_IMAGE: docker.io/library/postgres:17-bookworm
@@ -39,6 +45,10 @@ jobs:
           set -euo pipefail
           if [[ ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo '::error::GITHUB_SHA is not a full 40-character commit SHA.'
+            exit 1
+          fi
+          if [[ ! "${IMAGE_VERSION:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo '::error::IMAGE_VERSION must be a fixed vMAJOR.MINOR.PATCH value, such as v0.1.0.'
             exit 1
           fi
           if [[ -z "${DOCKERHUB_USERNAME:-}" ]]; then
@@ -112,20 +122,52 @@ jobs:
           printf '%s' "$DOCKERHUB_TOKEN" | docker login docker.io \
             --username "$DOCKERHUB_USERNAME" --password-stdin
 
-      - name: Publish only the tested image IDs with full commit SHA tags
+      - name: Publish tested image IDs with fixed version and full SHA tags
         run: |
           set -euo pipefail
-          tasks_image="docker.io/$DOCKERHUB_USERNAME/pa2577-tasks:$GITHUB_SHA"
-          statistics_image="docker.io/$DOCKERHUB_USERNAME/pa2577-statistics:$GITHUB_SHA"
-          docker tag "$TASKS_IMAGE_ID" "$tasks_image"
-          docker tag "$STATISTICS_IMAGE_ID" "$statistics_image"
-          [[ "$(docker image inspect --format '{{.Id}}' "$tasks_image")" == "$TASKS_IMAGE_ID" ]]
-          [[ "$(docker image inspect --format '{{.Id}}' "$statistics_image")" == "$STATISTICS_IMAGE_ID" ]]
-          docker push "$tasks_image"
-          docker push "$statistics_image"
+          tasks_repo="docker.io/$DOCKERHUB_USERNAME/pa2577-tasks"
+          statistics_repo="docker.io/$DOCKERHUB_USERNAME/pa2577-statistics"
+          tasks_sha_image="$tasks_repo:$GITHUB_SHA"
+          statistics_sha_image="$statistics_repo:$GITHUB_SHA"
+          tasks_version_image="$tasks_repo:$IMAGE_VERSION"
+          statistics_version_image="$statistics_repo:$IMAGE_VERSION"
+
+          # Fixed release tags are immutable by convention: refuse to overwrite one.
+          for image in "$tasks_version_image" "$statistics_version_image"; do
+            set +e
+            inspect_output=$(docker manifest inspect "$image" 2>&1)
+            inspect_status=$?
+            set -e
+            if [[ "$inspect_status" -eq 0 ]]; then
+              echo "::error::Release image tag already exists: $image"
+              exit 1
+            fi
+            if [[ "$inspect_output" != *"manifest unknown"* && "$inspect_output" != *"no such manifest"* ]]; then
+              echo '::error::Could not safely verify that the release image tag is unused; refusing to publish.'
+              exit 1
+            fi
+          done
+
+          docker tag "$TASKS_IMAGE_ID" "$tasks_sha_image"
+          docker tag "$STATISTICS_IMAGE_ID" "$statistics_sha_image"
+          docker tag "$TASKS_IMAGE_ID" "$tasks_version_image"
+          docker tag "$STATISTICS_IMAGE_ID" "$statistics_version_image"
+          for image in "$tasks_sha_image" "$tasks_version_image"; do
+            [[ "$(docker image inspect --format '{{.Id}}' "$image")" == "$TASKS_IMAGE_ID" ]]
+          done
+          for image in "$statistics_sha_image" "$statistics_version_image"; do
+            [[ "$(docker image inspect --format '{{.Id}}' "$image")" == "$STATISTICS_IMAGE_ID" ]]
+          done
+
+          docker push "$tasks_sha_image"
+          docker push "$statistics_sha_image"
+          docker push "$tasks_version_image"
+          docker push "$statistics_version_image"
           {
-            printf '## Tested Images\n\nCommit: `%s`\n\n' "$GITHUB_SHA"
-            printf -- '- `%s`\n- `%s`\n' "$tasks_image" "$statistics_image"
+            printf '## Tested Images\n\nCommit: `%s`\nVersion: `%s`\n\n' "$GITHUB_SHA" "$IMAGE_VERSION"
+            printf -- '- `%s`\n- `%s`\n- `%s`\n- `%s`\n' \
+              "$tasks_sha_image" "$statistics_sha_image" \
+              "$tasks_version_image" "$statistics_version_image"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Clean only this job's temporary resources, even on failure

@@ -2,8 +2,8 @@
 {{- if or (ne .Values.namespace "pa2577") (ne .Release.Namespace "pa2577") -}}
 {{- fail "Render this chart with --namespace pa2577; other namespaces are not supported." -}}
 {{- end -}}
-{{- if not (regexMatch "^[0-9a-f]{40}$" .Values.imageTag) -}}
-{{- fail "imageTag must be the full 40-character commit SHA verified by CI." -}}
+{{- if not (or (regexMatch "^[0-9a-f]{40}$" .Values.imageTag) (regexMatch "^v[0-9]+\\.[0-9]+\\.[0-9]+$" .Values.imageTag)) -}}
+{{- fail "imageTag must be a fixed vMAJOR.MINOR.PATCH tag or the full 40-character commit SHA verified by CI." -}}
 {{- end -}}
 {{- range $component := list "tasks" "statistics" -}}
 {{- $service := index $.Values $component -}}
