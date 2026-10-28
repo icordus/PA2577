@@ -27,7 +27,7 @@
 ## Evidence
 
 - [Deploy run 40537098402](https://github.com/icordus/PA2577/actions/runs/40537098402): `v0.1.0`, revision 6. This is the deployed baseline, not the new server-rendered UI.
-- Earlier Pi integration: 3 HTTP tests passed with PostgreSQL on temporary tmpfs; cleanup was reported complete. Original SHA publication: `5c65f2dcd675a1bc8b6d1b378bd10ba1b999b721`.
+- Earlier Pi integration: 3 HTTP tests passed with PostgreSQL on temporary tmpfs; cleanup was reported complete.
 - Earlier scaling: revisions 2/3 increased/reset Tasks; revisions 4/5 increased/reset Statistics. Both returned to one replica before revision 6.
 - Previous local review: 16 safety tests, 5 deployment-validator tests, Helm lint/template, and Bash/YAML checks passed.
 - Current local suite: 38 tests passed, including 17 web tests; 3 live-test suites were intentionally skipped. No live database writes, image build, or deployment was performed for this change.

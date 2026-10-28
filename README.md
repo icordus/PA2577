@@ -43,7 +43,7 @@ The list API does not call Statistics, so requests do not recurse.
 
 ## REST APIs
 
-Base URL in the current Pi deployment: `http://192.168.0.71:30081`.
+Deployment URL: `http://<NODE_IP>:30081`. Replace `<NODE_IP>` with your node's address.
 
 | Service | Method | Path | Purpose |
 | --- | --- | --- | --- |
@@ -97,11 +97,12 @@ Publish a new version and approve its deployment before demonstrating it on the 
 Read-only checks:
 
 ```bash
+TASKS_URL="http://<NODE_IP>:30081"
 helm status pa2577 --namespace pa2577
 kubectl -n pa2577 get deployments,pods,services,pvc
 kubectl get pv pa2577-postgres-pv
-curl --fail http://192.168.0.71:30081/ready
-curl --fail http://192.168.0.71:30081/api/statistics
+curl --fail "$TASKS_URL/ready"
+curl --fail "$TASKS_URL/api/statistics"
 ```
 
 ## CI

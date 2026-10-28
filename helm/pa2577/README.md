@@ -43,19 +43,14 @@ version on an existing data directory without a separate migration plan.
 
 ## External Access
 
-Application URL after the approved first deployment:
+Application URL (replace `<NODE_IP>` with your node's address):
 
-`http://192.168.0.71:30081/`
+`http://<NODE_IP>:30081/`
 
-Inspection on 2026-10-27 found NodePorts `30080` and `31674` already allocated.
-Port `30081` was free before installation and is now assigned to pa2577-tasks.
-The server accepted this port. Other ports in the NodePort range have not been
-validated for future use; recheck conflicts before changing the port.
+Tasks uses NodePort `30081`. Verify availability before selecting a different port.
 
-NodePort is not loopback-only: it can expose Tasks on node interfaces. HTTP at
-the node's LAN IP was verified from the Pi; access from the user's browser/device
-and external firewall/routing remain unverified. There is no authentication or
-HTTPS; do not expose this service directly to the Internet. Statistics and
+NodePort can expose Tasks on node interfaces. This application is intended for a
+trusted lab network, not direct Internet exposure. Statistics and
 PostgreSQL have no NodePort and are not directly exposed outside the cluster.
 
 ## Storage Preparation
@@ -75,13 +70,9 @@ Approved storage requirements for this single Pi:
 3. Ensure the mounted directory supports PostgreSQL UID/GID 999 and fsGroup 999.
    No privileged permission-fixing container is included in this chart.
 
-On 2026-10-27, after separate approvals, the user created
-`/var/lib/pa2577/postgresql` with mode 0700 and UID/GID 999:999. Those metadata
-were verified without reading or changing the directory contents. The agent
-then validated `storage/local-pv.yaml` using server-side dry-run and created
-only `pa2577-postgres-pv` with `kubectl create`. The actual PV was verified:
-2 GiB, `ReadWriteOnce`, filesystem mode, `Retain`, no StorageClass, local path
-above, and node affinity `kubernetes.io/hostname=raspberrypi2`.
+The local PV was provisioned separately after approval. Its data directory and
+node affinity must match the target environment; keep host-specific provisioning
+details in private operational documentation.
 
 The PV was initially `Available`, reserved for `pa2577/pa2577-postgres-data`.
 After the separately approved deployment, the PVC and PV are `Bound`, and
@@ -179,11 +170,12 @@ no elevated database role flags. No native service or database was changed.
 Read-only status and HTTP checks:
 
 ```bash
+TASKS_URL="http://<NODE_IP>:30081"
 helm status pa2577 --namespace pa2577
 kubectl -n pa2577 get deployments,pods,services,pvc
 kubectl get pv pa2577-postgres-pv
-curl --fail-with-body http://192.168.0.71:30081/ready
-curl --fail-with-body http://192.168.0.71:30081/api/statistics
+curl --fail-with-body "$TASKS_URL/ready"
+curl --fail-with-body "$TASKS_URL/api/statistics"
 ```
 
 Expected: deployed release, available workloads, Bound storage, readiness
@@ -228,6 +220,5 @@ Rendering alone checks templates, not live API admission or runtime behavior.
 The chart intentionally targets the inspected 1.28 series; it does not upgrade it.
 
 Do not install, upgrade, apply rendered output, provision storage, or create
-Secrets until the user approves those steps. The existing `calico-system`
-namespace was Terminating during inspection; earlier restart observations were
-not diagnosed here. A Ready node is not proof of complete cluster health.
+Secrets until the user approves those steps. Verify cluster health privately
+before making infrastructure changes.
