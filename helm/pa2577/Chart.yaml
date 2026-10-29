@@ -2,6 +2,6 @@ apiVersion: v2
 name: pa2577
 description: Task Manager services and persistent PostgreSQL on Linux ARM64
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "v0.1.0"
-kubeVersion: ">=1.28.0-0 <1.29.0-0"
+kubeVersion: ">=1.32.0-0 <1.33.0-0"

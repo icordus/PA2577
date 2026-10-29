@@ -1,6 +1,6 @@
 # PA2577 Helm Chart
 
-This chart is prepared for Kubernetes 1.28 on the ARM64 Raspberry Pi.
+This chart targets Kubernetes 1.32 on Linux ARM64.
 The first release, revision 1, passed the HTTP checks recorded below.
 Use release name `pa2577` and namespace `pa2577` for the names below.
 
@@ -209,15 +209,15 @@ has been performed; single-node replicas do not protect against failure of the P
 Run from the repository root:
 
 ```bash
-helm lint helm/pa2577 --namespace pa2577 --kube-version 1.28.15 --strict
-helm template pa2577 helm/pa2577 --namespace pa2577 --kube-version 1.28.15
+helm lint helm/pa2577 --namespace pa2577 --kube-version 1.32.0 --strict
+helm template pa2577 helm/pa2577 --namespace pa2577 --kube-version 1.32.0
 ```
 
 Independent scaling values were also linted/rendered with
 `--set tasks.replicaCount=2 --set statistics.replicaCount=3`. These local checks
 were followed by the separately approved live demonstration described above.
 Rendering alone checks templates, not live API admission or runtime behavior.
-The chart intentionally targets the inspected 1.28 series; it does not upgrade it.
+The chart metadata accepts Kubernetes 1.32.x. Chart validation does not upgrade the cluster.
 
 Do not install, upgrade, apply rendered output, provision storage, or create
 Secrets until the user approves those steps. Verify cluster health privately

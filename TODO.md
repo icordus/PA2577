@@ -23,6 +23,7 @@
 - [x] Local web tests cover forms, escaping, service errors, same-origin protection, and JSON API compatibility.
 - [x] Browser CRUD works with JavaScript disabled and simulated dependencies; desktop/mobile layout checked, with no horizontal overflow.
 - [x] Simplify README/TODO while preserving architecture, setup, CI/deploy, and limitations.
+- [x] Update the Helm chart compatibility range to Kubernetes 1.32 after the user's cluster-upgrade report; local lint/render validation is recorded below.
 
 ## Evidence
 
@@ -31,6 +32,7 @@
 - Earlier scaling: revisions 2/3 increased/reset Tasks; revisions 4/5 increased/reset Statistics. Both returned to one replica before revision 6.
 - Previous local review: 16 safety tests, 5 deployment-validator tests, Helm lint/template, and Bash/YAML checks passed.
 - Current local suite: 38 tests passed, including 17 web tests; 3 live-test suites were intentionally skipped. No live database writes, image build, or deployment was performed for this change.
+- User reports upgrading the cluster to Kubernetes 1.32 on 2026-10-29. This workspace has not independently queried the cluster; the chart now targets the 1.32 minor series.
 - Local `.venv` contains the existing project dependencies; no Node or frontend build dependencies are needed.
 
 ## To Deliver
@@ -39,7 +41,7 @@
 - [ ] Publish a new, unused version through CI and record its run and version/SHA image references. Do not overwrite `v0.1.0`.
 - [ ] After approval, deploy the new server-rendered UI and verify its browser CRUD flow.
 - [ ] Record the CI run proving how the existing `v0.1.0` tags were published; successful deployment alone does not establish provenance.
-- [ ] Record and link the required 5-10 minute video: UI, architecture, Kubernetes resources/YAML, CI/deploy, scaling, and persistence evidence.
+- [ ] Record and link the required 5-10 minute video using the [VIDEO.md](VIDEO.md) script: UI, architecture, Kubernetes resources/YAML, CI/deploy, scaling, and persistence evidence.
 
 ## Known Limitations
 
